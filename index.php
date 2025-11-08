@@ -955,7 +955,7 @@ foreach( $faviconCandidates as $candidate ){
             --card-bg: rgba(255, 255, 255, 0.02);
             --container-max-width: 1400px;
             --grid-gap: 32px;
-            --body-padding-top: 24px;
+            --body-padding-top: 60px;
             --body-padding-bottom: 24px;
             --body-padding-x: clamp(16px, 3vw, 32px);
         }
@@ -990,7 +990,8 @@ foreach( $faviconCandidates as $candidate ){
         .theme-toggle {
             position: fixed;
             top: 16px;
-            left: var(--body-padding-x);
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
             gap: 10px;
             padding: 10px 14px;
