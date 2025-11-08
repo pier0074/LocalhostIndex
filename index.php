@@ -11,6 +11,7 @@
 define( 'CSRF_TOKEN_LENGTH', 32 );        // Length of CSRF token in bytes
 define( 'MYSQL_TIMEOUT', 2 );             // MySQL connection timeout in seconds
 define( 'RECENT_ITEMS_LIMIT', 5 );        // Number of recent items to display
+define( 'CACHE_TTL', 60 );                // Cache time-to-live in seconds
 
 $options = [
 	/**
@@ -56,6 +57,19 @@ $options = [
 	 *   ]
 	 */
 	'mysql' => [],
+
+	/**
+	 * Display Settings
+	 * Customize how files and folders are displayed
+	 */
+	'display' => [
+		// Show file sizes in directory listing
+		'show_file_sizes' => true,
+		// Default sort order: 'name', 'date', 'size'
+		'default_sort' => 'name',
+		// Enable caching (improves performance with many files)
+		'enable_cache' => true,
+	],
 
 	/**
 	 * Security Settings
@@ -440,41 +454,99 @@ function formatRelativeTime( $timestamp ) {
 	return max( 1, $diff ) . 's ago';
 }
 
-// read all items in the ./ dir
-$directoryList = [];
-if( $handle = opendir( './' ) ){
-	$itemList = [];
-	while( false !== ( $item = readdir( $handle ) ) ){
-		if( $item == '..' || $item == '.' || filenameMatch( $options['exclude'], $item ) ){
-			continue;
-		}
+/**
+ * Get cached directory listing or scan directory
+ */
+function getDirectoryListing( $options ) {
+	$cacheEnabled = $options['display']['enable_cache'] ?? true;
+	$cacheKey = 'directory_listing_cache';
+	$cacheFile = sys_get_temp_dir() . '/' . md5( __DIR__ ) . '_localhostindex.cache';
 
-		// Security: Validate path against traversal attacks
-		$strictValidation = $options['security']['strict_path_validation'] ?? true;
-		if( !validatePath( $item, $strictValidation ) ){
-			continue;
-		}
-
-		$itemType = is_dir( $item ) ? 'dir' : 'file';
-		$order = ( $itemType == 'dir' ) ? 1 : 0;
-		$itemList[] = [
-			'name' => $item,
-			'type' => $itemType,
-			'order' => $order
-		];
-	}
-	usort(
-		$itemList,
-		static function ( $a, $b ) {
-			if( $a['order'] === $b['order'] ){
-				return strcasecmp( $a['name'], $b['name'] );
+	// Check cache
+	if( $cacheEnabled && file_exists( $cacheFile ) ){
+		$cacheData = @file_get_contents( $cacheFile );
+		if( $cacheData !== false ){
+			$cache = @unserialize( $cacheData );
+			if( is_array( $cache ) && isset( $cache['timestamp'], $cache['data'] ) ){
+				if( ( time() - $cache['timestamp'] ) < CACHE_TTL ){
+					return $cache['data'];
+				}
 			}
-			return $b['order'] <=> $a['order'];
 		}
-	);
-	$directoryList = $itemList;
-	closedir( $handle );
+	}
+
+	// Scan directory
+	$directoryList = [];
+	if( $handle = opendir( './' ) ){
+		while( false !== ( $item = readdir( $handle ) ) ){
+			if( $item == '..' || $item == '.' || filenameMatch( $options['exclude'], $item ) ){
+				continue;
+			}
+
+			// Security: Validate path against traversal attacks
+			$strictValidation = $options['security']['strict_path_validation'] ?? true;
+			if( !validatePath( $item, $strictValidation ) ){
+				continue;
+			}
+
+			$path = __DIR__ . '/' . $item;
+			$isDir = is_dir( $path );
+			$itemType = $isDir ? 'dir' : 'file';
+
+			$itemData = [
+				'name' => $item,
+				'type' => $itemType,
+				'mtime' => filemtime( $path ),
+			];
+
+			// Add file size for files
+			if( !$isDir ){
+				$itemData['size'] = filesize( $path );
+			}
+
+			$directoryList[] = $itemData;
+		}
+		closedir( $handle );
+	}
+
+	// Cache the results
+	if( $cacheEnabled ){
+		$cacheData = serialize([
+			'timestamp' => time(),
+			'data' => $directoryList
+		]);
+		@file_put_contents( $cacheFile, $cacheData );
+	}
+
+	return $directoryList;
 }
+
+// read all items in the ./ dir
+$directoryList = getDirectoryListing( $options );
+
+// Sort directory based on user preference or default
+$defaultSort = $options['display']['default_sort'] ?? 'name';
+$sortOrder = $_GET['sort'] ?? $defaultSort;
+
+usort( $directoryList, static function ( $a, $b ) use ( $sortOrder ) {
+	// Directories always first
+	if( $a['type'] !== $b['type'] ){
+		return $a['type'] === 'dir' ? -1 : 1;
+	}
+
+	// Then sort by specified field
+	switch( $sortOrder ){
+		case 'date':
+			return $b['mtime'] <=> $a['mtime'];
+		case 'size':
+			$aSize = $a['size'] ?? 0;
+			$bSize = $b['size'] ?? 0;
+			return $bSize <=> $aSize;
+		case 'name':
+		default:
+			return strcasecmp( $a['name'], $b['name'] );
+	}
+});
 
 $projectCount = 0;
 $fileCount = 0;
@@ -487,12 +559,9 @@ foreach( $directoryList as $item ){
 	$projectCount += $isDir ? 1 : 0;
 	$fileCount += $isDir ? 0 : 1;
 
-	$path = __DIR__ . '/' . $item['name'];
-	$mtime = filemtime( $path );
-	if( $mtime !== false && $mtime > 0 ){
-		$recentItems[] = $item + [
-			'mtime' => $mtime,
-		];
+	$mtime = $item['mtime'] ?? 0;
+	if( $mtime > 0 ){
+		$recentItems[] = $item;
 		if( $mtime > $latestMtime ){
 			$latestMtime = $mtime;
 			$latestItem = $item;
@@ -821,8 +890,50 @@ foreach( $faviconCandidates as $candidate ){
             max-height: 600px;
         }
 
+        main > .projects .projects-header {
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
         main > .projects h2 {
             flex-shrink: 0;
+            margin-bottom: 0;
+        }
+
+        .sort-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .sort-btn {
+            background: var(--input-bg);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            color: var(--color-muted);
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+
+        .sort-btn:hover {
+            background: var(--input-focus-bg);
+            color: var(--color-text);
+        }
+
+        .sort-btn.active {
+            background: var(--color-accent);
+            color: var(--color-bkg);
+            font-weight: bold;
+        }
+
+        .sort-btn:focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
         }
 
         main > .projects .content {
@@ -973,6 +1084,10 @@ foreach( $faviconCandidates as $candidate ){
 
         .projects ul li {
             margin: 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
 
         .projects ul li.hidden {
@@ -984,6 +1099,15 @@ foreach( $faviconCandidates as $candidate ){
             border-radius: 3px;
             font-size: 13px;
             padding: 2px 4px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .projects ul li .file-size {
+            font-size: 11px;
+            color: var(--color-muted);
+            white-space: nowrap;
+            font-weight: normal;
         }
 
         .projects ul li.dir a {
@@ -1100,15 +1224,28 @@ foreach( $faviconCandidates as $candidate ){
 </div>
 <main>
     <div class="projects">
-        <h2>projects</h2>
+        <div class="projects-header">
+            <h2>projects</h2>
+            <div class="sort-buttons">
+                <button class="sort-btn <?= $sortOrder === 'name' ? 'active' : '' ?>" data-sort="name" title="Sort by name">A-Z</button>
+                <button class="sort-btn <?= $sortOrder === 'date' ? 'active' : '' ?>" data-sort="date" title="Sort by date">📅</button>
+                <button class="sort-btn <?= $sortOrder === 'size' ? 'active' : '' ?>" data-sort="size" title="Sort by size">💾</button>
+            </div>
+        </div>
         <div class="content">
             <input type="text" placeholder="Search" class="search">
             <ul>
-				<?php foreach( $directoryList as $item ): ?>
-                    <li class="<?= $item['type'] ?>">
-                        <a target="_blank" href="<?= $item['name'] ?>">
-							<?= $item['name']; ?>
+				<?php foreach( $directoryList as $item ):
+					$showSize = $options['display']['show_file_sizes'] ?? true;
+					$size = isset( $item['size'] ) && $showSize ? humanFileSize( $item['size'] ) : '';
+				?>
+                    <li class="<?= $item['type'] ?>" data-name="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
+                        <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
+							<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
                         </a>
+						<?php if( $size ): ?>
+                            <span class="file-size"><?= $size ?></span>
+						<?php endif; ?>
                     </li>
 				<?php endforeach; ?>
             </ul>
@@ -1286,6 +1423,17 @@ foreach( $faviconCandidates as $candidate ){
             } else if (el.innerText.indexOf(val) <= -1) {
                 el.classList.add('hidden');
             }
+        });
+    });
+
+    // Sort button handlers
+    const sortButtons = document.querySelectorAll('.sort-btn');
+    sortButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const sortType = btn.dataset.sort;
+            const url = new URL(window.location);
+            url.searchParams.set('sort', sortType);
+            window.location.href = url.toString();
         });
     });
 </script>
