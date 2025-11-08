@@ -729,75 +729,76 @@ foreach( $directoryList as $item ){
 	}
 }
 
-// Combined Stats (Projects + System)
-$stats = [];
+// Stats: Preview (folded) and Extended (expanded)
+$statsPreview = [];
+$statsExtended = [];
 
-// Project Stats (always visible)
+// Preview stats (always visible when folded)
 if( $projectCount > 0 ){
-	$stats['Projects'] = number_format( $projectCount );
-}
-if( $fileCount > 0 ){
-	$stats['Files'] = number_format( $fileCount );
-}
-if( $latestItem ){
-	$stats['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
+	$statsPreview['Projects'] = number_format( $projectCount );
 }
 
-// System Stats (expandable)
-$systemStats = [];
 $diskTotal = disk_total_space( __DIR__ );
 $diskFree = disk_free_space( __DIR__ );
 if( $diskTotal !== false && $diskTotal > 0 && $diskFree !== false ){
 	$freePercent = round( ( $diskFree / $diskTotal ) * 100 );
-	$systemStats['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
+	$statsPreview['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
+}
+
+// Extended stats (shown when expanded) - keep same order
+if( $fileCount > 0 ){
+	$statsExtended['Files'] = number_format( $fileCount );
+}
+if( $latestItem ){
+	$statsExtended['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
 }
 
 // Total Disk
 if( $diskTotal !== false && $diskTotal > 0 ){
-	$systemStats['Total disk'] = humanFileSize( $diskTotal );
+	$statsExtended['Total disk'] = humanFileSize( $diskTotal );
 }
 
-// Memory
+// Memory (extended)
 if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
 	$memInfo = @shell_exec( PHP_OS_FAMILY === 'Darwin' ? 'sysctl hw.memsize' : 'free -b | grep Mem' );
 	if( $memInfo ){
 		if( PHP_OS_FAMILY === 'Darwin' ){
 			if( preg_match( '/hw\.memsize:\s+(\d+)/', $memInfo, $matches ) ){
-				$systemStats['Memory'] = humanFileSize( (int)$matches[1] );
+				$statsExtended['Memory'] = humanFileSize( (int)$matches[1] );
 			}
 		} else {
 			if( preg_match( '/Mem:\s+(\d+)/', $memInfo, $matches ) ){
-				$systemStats['Memory'] = humanFileSize( (int)$matches[1] );
+				$statsExtended['Memory'] = humanFileSize( (int)$matches[1] );
 			}
 		}
 	}
 }
 
-// CPU Info
+// CPU Info (extended)
 if( PHP_OS_FAMILY === 'Darwin' ){
 	$cpuModel = @shell_exec( 'sysctl -n machdep.cpu.brand_string' );
 	$cpuCores = @shell_exec( 'sysctl -n hw.ncpu' );
 	if( $cpuModel && $cpuCores ){
 		$cpuModel = trim( $cpuModel );
 		$cpuCores = trim( $cpuCores );
-		$systemStats['CPU'] = $cpuCores . ' cores';
+		$statsExtended['CPU'] = $cpuCores . ' cores';
 	}
 } elseif( PHP_OS_FAMILY === 'Linux' ){
 	$cpuInfo = @shell_exec( 'nproc' );
 	if( $cpuInfo ){
-		$systemStats['CPU'] = trim( $cpuInfo ) . ' cores';
+		$statsExtended['CPU'] = trim( $cpuInfo ) . ' cores';
 	}
 }
 
-// Uptime
+// Uptime (extended)
 if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
 	$uptime = @shell_exec( 'uptime' );
 	if( $uptime && preg_match( '/up\s+(.+?),\s+\d+\s+user/', $uptime, $matches ) ){
-		$systemStats['Uptime'] = trim( $matches[1] );
+		$statsExtended['Uptime'] = trim( $matches[1] );
 	}
 }
 
-// OS Version
+// OS Version (preview - last item when folded)
 if( PHP_OS_FAMILY === 'Darwin' ){
 	$osVersion = @shell_exec( 'sw_vers -productVersion' );
 	if( $osVersion ){
@@ -816,12 +817,12 @@ if( PHP_OS_FAMILY === 'Darwin' ){
 		];
 
 		$versionName = $versionNames[$majorVersion] ?? 'macOS';
-		$systemStats['OS'] = "macOS {$version} ({$versionName})";
+		$statsPreview['OS'] = "macOS {$version} ({$versionName})";
 	}
 } elseif( PHP_OS_FAMILY === 'Linux' ){
 	$osVersion = @shell_exec( "lsb_release -ds 2>/dev/null || cat /etc/*release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'" );
 	if( $osVersion ){
-		$systemStats['OS'] = trim( explode( "\n", $osVersion )[0] );
+		$statsPreview['OS'] = trim( explode( "\n", $osVersion )[0] );
 	}
 }
 
@@ -1753,24 +1754,24 @@ foreach( $faviconCandidates as $candidate ){
                 </ul>
             </div>
 		<?php endif; ?>
-		<?php if( !empty( $stats ) ): ?>
+		<?php if( !empty( $statsPreview ) ): ?>
             <div class="stats">
                 <div class="section-header">
                     <h2>stats</h2>
                     <button class="toggle-btn" data-target="stats-extended" aria-label="Expand stats">+</button>
                 </div>
                 <div class="table">
-					<?php foreach( $stats as $label => $value ): ?>
+					<?php foreach( $statsPreview as $label => $value ): ?>
                         <div>
                             <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
                             <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
                         </div>
 					<?php endforeach; ?>
                 </div>
-				<?php if( !empty( $systemStats ) ): ?>
+				<?php if( !empty( $statsExtended ) ): ?>
                 <div id="stats-extended" class="extended-section" style="display: none;">
                     <div class="table">
-						<?php foreach( $systemStats as $label => $value ): ?>
+						<?php foreach( $statsExtended as $label => $value ): ?>
                             <div>
                                 <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
                                 <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
@@ -1786,16 +1787,18 @@ foreach( $faviconCandidates as $candidate ){
                     <h2>actions</h2>
                     <button class="toggle-btn" data-target="actions-extended" aria-label="Expand actions">+</button>
                 </div>
+                <div class="action-buttons">
+                    <button class="action-btn" data-action="clear-cache" title="Clear PHP opcache">
+                        <span>🗑️</span> Clear Cache
+                    </button>
+                    <button class="action-btn" data-action="restart-apache" title="Restart Apache web server">
+                        <span>🔄</span> Restart Apache
+                    </button>
+                </div>
                 <div id="actions-extended" class="extended-section" style="display: none;">
                     <div class="action-buttons">
-                        <button class="action-btn" data-action="restart-apache" title="Restart Apache web server">
-                            <span>🔄</span> Restart Apache
-                        </button>
                         <button class="action-btn" data-action="restart-mysql" title="Restart MySQL database">
                             <span>🔄</span> Restart MySQL
-                        </button>
-                        <button class="action-btn" data-action="clear-cache" title="Clear PHP opcache">
-                            <span>🗑️</span> Clear Cache
                         </button>
                         <button class="action-btn" data-action="view-logs" title="View Apache error log">
                             <span>📋</span> View Logs
