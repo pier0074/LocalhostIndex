@@ -1048,7 +1048,7 @@ foreach( $faviconCandidates as $candidate ){
             min-width: 0;
             display: flex;
             flex-direction: column;
-            max-height: 600px;
+            max-height: calc(100vh - 200px);
         }
 
         main > .projects .projects-header {
