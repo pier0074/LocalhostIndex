@@ -731,16 +731,18 @@ foreach( $directoryList as $item ){
 }
 
 // Stats: Preview (folded) and Extended (expanded)
-// When expanded, show all stats in order with separator between project and system stats
+// Preview: Projects, Disk free, OS
+// Expanded Section 1 (Project Stats): Projects, Files, Last update
+// Expanded Section 2 (System Stats): Disk free, Total disk, Memory, CPU, Uptime, OS
 $statsPreview = [];
 $statsProjectExpanded = [];
 $statsSystemExpanded = [];
 
-// Get disk info first (used in both preview and expanded)
+// Get disk info first (used in both preview and system expanded)
 $diskTotal = disk_total_space( __DIR__ );
 $diskFree = disk_free_space( __DIR__ );
 
-// Preview stats (always visible when folded)
+// Preview stats (only visible when folded)
 if( $projectCount > 0 ){
 	$statsPreview['Projects'] = number_format( $projectCount );
 }
@@ -749,7 +751,10 @@ if( $diskTotal !== false && $diskTotal > 0 && $diskFree !== false ){
 	$statsPreview['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
 }
 
-// Project Stats (expanded) - shown after preview when expanded
+// Project Stats (expanded section 1): Projects, Files, Last update
+if( $projectCount > 0 ){
+	$statsProjectExpanded['Projects'] = number_format( $projectCount );
+}
 if( $fileCount > 0 ){
 	$statsProjectExpanded['Files'] = number_format( $fileCount );
 }
@@ -757,7 +762,11 @@ if( $latestItem ){
 	$statsProjectExpanded['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
 }
 
-// System Stats (expanded) - shown after project stats with separator
+// System Stats (expanded section 2): Disk free, Total disk, Memory, CPU, Uptime, OS
+if( $diskTotal !== false && $diskTotal > 0 && $diskFree !== false ){
+	$freePercent = round( ( $diskFree / $diskTotal ) * 100 );
+	$statsSystemExpanded['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
+}
 if( $diskTotal !== false && $diskTotal > 0 ){
 	$statsSystemExpanded['Total disk'] = humanFileSize( $diskTotal );
 }
@@ -802,7 +811,7 @@ if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
 	}
 }
 
-// OS Version (in preview - last item when folded)
+// OS Version (in both preview and system expanded)
 if( PHP_OS_FAMILY === 'Darwin' ){
 	$osVersion = @shell_exec( 'sw_vers -productVersion' );
 	if( $osVersion ){
@@ -821,8 +830,9 @@ if( PHP_OS_FAMILY === 'Darwin' ){
 		];
 
 		$versionName = $versionNames[$majorVersion] ?? 'macOS';
-		$statsPreview['OS'] = "macOS {$version} ({$versionName})";
-		$statsSystemExpanded['OS'] = "macOS {$version} ({$versionName})";
+		$osDisplayValue = "macOS {$version} ({$versionName})";
+		$statsPreview['OS'] = $osDisplayValue;
+		$statsSystemExpanded['OS'] = $osDisplayValue;
 	}
 } elseif( PHP_OS_FAMILY === 'Linux' ){
 	$osVersion = @shell_exec( "lsb_release -ds 2>/dev/null || cat /etc/*release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'" );
