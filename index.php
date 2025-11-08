@@ -406,9 +406,9 @@ if( isset( $_POST['action'] ) ){
 
 		case 'reload-apache':
 			if( PHP_OS_FAMILY === 'Darwin' ){
-				$output = @shell_exec( 'sudo apachectl graceful 2>&1' );
+				$output = @shell_exec( 'apachectl graceful 2>&1' );
 			} else {
-				$output = @shell_exec( 'sudo systemctl reload apache2 2>&1' );
+				$output = @shell_exec( 'systemctl reload apache2 2>&1' );
 			}
 			$result = [ 'success' => true, 'message' => 'Apache config reloaded', 'output' => $output ];
 			break;
@@ -472,12 +472,36 @@ if( isset( $_POST['action'] ) ){
 			break;
 
 		case 'view-mysql-log':
-			$logFile = '/var/log/mysql/error.log';
-			if( !file_exists( $logFile ) ){
-				$logFile = '/usr/local/var/mysql/*.err';
+			// Try to find MySQL error log dynamically
+			$logFile = null;
+			$possiblePaths = [
+				'/var/log/mysql/error.log',
+				'/usr/local/var/mysql/*.err',
+				'/opt/homebrew/var/mysql/*.err',
+				'/var/log/mysqld.log',
+				'/var/log/mysql.log'
+			];
+
+			foreach( $possiblePaths as $path ){
+				if( strpos( $path, '*' ) !== false ){
+					// Glob pattern
+					$files = glob( $path );
+					if( !empty( $files ) ){
+						$logFile = $files[0];
+						break;
+					}
+				} elseif( file_exists( $path ) ){
+					$logFile = $path;
+					break;
+				}
 			}
-			$output = @shell_exec( "tail -n 50 {$logFile} 2>&1" );
-			$result = [ 'success' => true, 'message' => 'MySQL Error Log (last 50 lines)', 'output' => $output ];
+
+			if( $logFile ){
+				$output = @shell_exec( "tail -n 50 " . escapeshellarg( $logFile ) . " 2>&1" );
+				$result = [ 'success' => true, 'message' => 'MySQL Error Log (last 50 lines)', 'output' => $output ];
+			} else {
+				$result = [ 'success' => false, 'message' => 'MySQL error log not found in common locations' ];
+			}
 			break;
 
 		case 'clear-logs':
@@ -488,10 +512,6 @@ if( isset( $_POST['action'] ) ){
 			$result = [ 'success' => true, 'message' => 'Log files cleared' ];
 			break;
 
-		case 'download-logs':
-			// This will be handled differently - return a message
-			$result = [ 'success' => true, 'message' => 'Log download not yet implemented', 'output' => 'Use action buttons to view logs individually' ];
-			break;
 	}
 
 	echo json_encode( $result );
@@ -1553,6 +1573,14 @@ foreach( $faviconCandidates as $candidate ){
             gap: 8px;
         }
 
+        #actions-preview {
+            display: grid;
+        }
+
+        #actions-extended {
+            display: none;
+        }
+
         .action-btn {
             background: var(--input-bg);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -2123,9 +2151,6 @@ foreach( $faviconCandidates as $candidate ){
                             <button class="action-btn" data-action="clear-logs" title="Clear log files">
                                 <span>🗑️</span> Clear Logs
                             </button>
-                            <button class="action-btn" data-action="download-logs" title="Download log archive">
-                                <span>⬇️</span> Download Logs
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -2370,7 +2395,8 @@ foreach( $faviconCandidates as $candidate ){
                     if (previewId) {
                         const preview = document.getElementById(previewId);
                         if (preview) {
-                            preview.style.display = 'block';
+                            // Use grid for action-buttons, block for others
+                            preview.style.display = preview.classList.contains('action-buttons') ? 'grid' : 'block';
                         }
                     }
 
@@ -2415,7 +2441,20 @@ foreach( $faviconCandidates as $candidate ){
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(text => {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Invalid JSON response:', text);
+                    throw new Error('Server returned invalid JSON');
+                }
+            })
             .then(data => {
                 // Re-enable button
                 this.disabled = false;
