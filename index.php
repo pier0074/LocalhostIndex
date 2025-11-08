@@ -360,105 +360,6 @@ if( isset( $_POST['action'] ) ){
 	$result = [ 'success' => false, 'message' => 'Unknown action' ];
 
 	switch( $action ){
-		case 'clear-browser-cache':
-			$result = [ 'success' => true, 'message' => 'Browser cache cleared! (Press Cmd+Shift+R or Ctrl+Shift+R to hard reload)' ];
-			break;
-
-		case 'mysql-status':
-			if( PHP_OS_FAMILY === 'Darwin' ){
-				// Check if MySQL process is running
-				$ps = (string) @shell_exec( 'ps aux | grep mysqld | grep -v grep' );
-				$isRunning = strlen( trim( $ps ) ) > 0;
-			} else {
-				$status = (string) @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
-				$isRunning = trim( $status ) === 'active';
-			}
-			$result = [ 'success' => true, 'running' => $isRunning ];
-			break;
-
-		case 'toggle-mysql':
-			if( PHP_OS_FAMILY === 'Darwin' ){
-				// Check if MySQL process is running
-				$ps = (string) @shell_exec( 'ps aux | grep mysqld | grep -v grep' );
-				$isRunning = strlen( trim( $ps ) ) > 0;
-
-				if( $isRunning ){
-					// Try different stop methods
-					if( file_exists( '/usr/local/mysql/support-files/mysql.server' ) ){
-						$output = @shell_exec( '/usr/local/mysql/support-files/mysql.server stop 2>&1' );
-					} elseif( file_exists( '/usr/local/bin/mysql.server' ) ){
-						$output = @shell_exec( '/usr/local/bin/mysql.server stop 2>&1' );
-					} else {
-						// Try brew if available
-						$output = @shell_exec( 'brew services stop mysql 2>&1' );
-					}
-					$result = [ 'success' => true, 'message' => 'MySQL stopped', 'output' => $output ];
-				} else {
-					// Try different start methods
-					if( file_exists( '/usr/local/mysql/support-files/mysql.server' ) ){
-						$output = @shell_exec( '/usr/local/mysql/support-files/mysql.server start 2>&1' );
-					} elseif( file_exists( '/usr/local/bin/mysql.server' ) ){
-						$output = @shell_exec( '/usr/local/bin/mysql.server start 2>&1' );
-					} else {
-						// Try brew if available
-						$output = @shell_exec( 'brew services start mysql 2>&1' );
-					}
-					$result = [ 'success' => true, 'message' => 'MySQL started', 'output' => $output ];
-				}
-			} else {
-				$output = (string) @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
-				if( trim( $output ) === 'active' ){
-					$output = @shell_exec( 'sudo systemctl stop mysql 2>&1' );
-					$result = [ 'success' => true, 'message' => 'MySQL stopped', 'output' => $output ];
-				} else {
-					$output = @shell_exec( 'sudo systemctl start mysql 2>&1' );
-					$result = [ 'success' => true, 'message' => 'MySQL started', 'output' => $output ];
-				}
-			}
-			break;
-
-		case 'restart-php-fpm':
-			if( PHP_OS_FAMILY === 'Darwin' ){
-				$output = @shell_exec( 'brew services restart php 2>&1' );
-			} else {
-				$output = @shell_exec( 'sudo systemctl restart php-fpm 2>&1' );
-			}
-			$result = [ 'success' => true, 'message' => 'PHP-FPM restarted', 'output' => $output ];
-			break;
-
-		case 'reload-apache':
-			if( PHP_OS_FAMILY === 'Darwin' ){
-				$output = @shell_exec( 'apachectl graceful 2>&1' );
-			} else {
-				$output = @shell_exec( 'systemctl reload apache2 2>&1' );
-			}
-			$result = [ 'success' => true, 'message' => 'Apache config reloaded', 'output' => $output ];
-			break;
-
-		case 'server-status':
-			$status = [];
-			if( function_exists( 'apache_get_version' ) ){
-				$status[] = 'Apache: ' . apache_get_version();
-			}
-			$status[] = 'PHP: ' . phpversion();
-
-			// Try MySQL connection (PHP 8.1+ throws exceptions)
-			try {
-				mysqli_report( MYSQLI_REPORT_OFF );
-				$mysqli = @new mysqli( 'localhost', 'root', '' );
-				if( $mysqli->connect_error ){
-					$status[] = 'MySQL: Not connected';
-				} else {
-					$status[] = 'MySQL: Connected (' . $mysqli->server_info . ')';
-					$mysqli->close();
-				}
-			} catch( Exception $e ){
-				$status[] = 'MySQL: Not connected';
-			}
-
-			$result = [ 'success' => true, 'message' => 'Server Status', 'output' => implode( "\n", $status ) ];
-			break;
-
 		case 'clear-opcache':
 			if( function_exists( 'opcache_reset' ) ){
 				opcache_reset();
@@ -473,73 +374,6 @@ if( isset( $_POST['action'] ) ){
 			$output = @shell_exec( "find {$sessionPath} -name 'sess_*' -type f -delete 2>&1" );
 			$result = [ 'success' => true, 'message' => 'Session files cleared', 'output' => $output ];
 			break;
-
-		case 'clear-all-caches':
-			$messages = [];
-			if( function_exists( 'opcache_reset' ) ){
-				opcache_reset();
-				$messages[] = 'OPcache cleared';
-			}
-			$sessionPath = session_save_path() ?: '/tmp';
-			@shell_exec( "find {$sessionPath} -name 'sess_*' -type f -delete 2>&1" );
-			$messages[] = 'Session files cleared';
-			$result = [ 'success' => true, 'message' => 'All caches cleared', 'output' => implode( "\n", $messages ) ];
-			break;
-
-		case 'view-php-log':
-			$logFile = ini_get( 'error_log' );
-			if( !$logFile || $logFile === 'syslog' ){
-				$logFile = '/var/log/php_errors.log';
-			}
-			if( file_exists( $logFile ) ){
-				$output = @shell_exec( "tail -n 50 {$logFile} 2>&1" );
-				$result = [ 'success' => true, 'message' => 'PHP Error Log (last 50 lines)', 'output' => $output ];
-			} else {
-				$result = [ 'success' => false, 'message' => 'PHP error log not found' ];
-			}
-			break;
-
-		case 'view-mysql-log':
-			// Try to find MySQL error log dynamically
-			$logFile = null;
-			$possiblePaths = [
-				'/var/log/mysql/error.log',
-				'/usr/local/var/mysql/*.err',
-				'/opt/homebrew/var/mysql/*.err',
-				'/var/log/mysqld.log',
-				'/var/log/mysql.log'
-			];
-
-			foreach( $possiblePaths as $path ){
-				if( strpos( $path, '*' ) !== false ){
-					// Glob pattern
-					$files = glob( $path );
-					if( !empty( $files ) ){
-						$logFile = $files[0];
-						break;
-					}
-				} elseif( file_exists( $path ) ){
-					$logFile = $path;
-					break;
-				}
-			}
-
-			if( $logFile ){
-				$output = @shell_exec( "tail -n 50 " . escapeshellarg( $logFile ) . " 2>&1" );
-				$result = [ 'success' => true, 'message' => 'MySQL Error Log (last 50 lines)', 'output' => $output ];
-			} else {
-				$result = [ 'success' => false, 'message' => 'MySQL error log not found in common locations' ];
-			}
-			break;
-
-		case 'clear-logs':
-			$phpLog = ini_get( 'error_log' );
-			if( $phpLog && $phpLog !== 'syslog' && file_exists( $phpLog ) ){
-				@file_put_contents( $phpLog, '' );
-			}
-			$result = [ 'success' => true, 'message' => 'Log files cleared' ];
-			break;
-
 	}
 
 	echo json_encode( $result );
@@ -2120,70 +1954,17 @@ foreach( $faviconCandidates as $candidate ){
             <div class="actions">
                 <div class="section-header">
                     <h2>actions</h2>
-                    <button class="toggle-btn" data-target="actions-extended" data-preview="actions-preview" aria-label="Expand actions">+</button>
                 </div>
-                <div id="actions-preview" class="action-buttons">
-                    <button class="action-btn" data-action="clear-browser-cache" title="Clear browser cache">
-                        <span>🗑️</span> Clear Cache
+                <div class="action-buttons">
+                    <button class="action-btn" data-action="clear-opcache" title="Clear OPcache">
+                        <span>🗑️</span> Clear OPcache
                     </button>
-                    <button class="action-btn" data-action="toggle-mysql" title="Start/Stop MySQL">
-                        <span>🔄</span> Start/Stop MySQL
+                    <button class="action-btn" data-action="clear-sessions" title="Clear session files">
+                        <span>🗑️</span> Clear Sessions
                     </button>
                 </div>
-                <div id="actions-extended" style="display: none;">
-                    <!-- Server Management -->
-                    <div class="action-section">
-                        <h3>Server Management</h3>
-                        <div class="action-buttons">
-                            <button class="action-btn" data-action="restart-php-fpm" title="Restart PHP-FPM">
-                                <span>🔄</span> Restart PHP-FPM
-                            </button>
-                            <button class="action-btn" data-action="reload-apache" title="Reload Apache config">
-                                <span>🔄</span> Reload Apache Config
-                            </button>
-                            <button class="action-btn" data-action="toggle-mysql" title="Start/Stop MySQL">
-                                <span>🔄</span> Start/Stop MySQL
-                            </button>
-                            <button class="action-btn" data-action="server-status" title="Check server status">
-                                <span>📊</span> Check Server Status
-                            </button>
-                        </div>
-                    </div>
 
-                    <!-- Cache Management -->
-                    <div class="action-section" style="margin-top: calc(var(--spacing-unit) * 2); padding-top: calc(var(--spacing-unit) * 2); border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                        <h3>Cache Management</h3>
-                        <div class="action-buttons">
-                            <button class="action-btn" data-action="clear-opcache" title="Clear PHP OPcache">
-                                <span>🗑️</span> Clear OPcache
-                            </button>
-                            <button class="action-btn" data-action="clear-sessions" title="Clear session files">
-                                <span>🗑️</span> Clear Sessions
-                            </button>
-                            <button class="action-btn" data-action="clear-all-caches" title="Clear all caches">
-                                <span>🗑️</span> Clear All Caches
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Log Management -->
-                    <div class="action-section" style="margin-top: calc(var(--spacing-unit) * 2); padding-top: calc(var(--spacing-unit) * 2); border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                        <h3>Log Management</h3>
-                        <div class="action-buttons">
-                            <button class="action-btn" data-action="view-php-log" title="View PHP error log">
-                                <span>📋</span> View PHP Log
-                            </button>
-                            <button class="action-btn" data-action="view-mysql-log" title="View MySQL log">
-                                <span>📋</span> View MySQL Log
-                            </button>
-                            <button class="action-btn" data-action="clear-logs" title="Clear log files">
-                                <span>🗑️</span> Clear Logs
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Action Output Modal -->
+                <!-- Action Output -->
                 <div id="action-output" style="display: none; margin-top: calc(var(--spacing-unit) * 2); padding: var(--card-padding); background: var(--input-bg); border-radius: var(--card-radius); border: 1px solid rgba(255, 255, 255, 0.1);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: calc(var(--spacing-unit) * 2);">
                         <strong id="action-output-title">Output</strong>
@@ -2455,7 +2236,6 @@ foreach( $faviconCandidates as $candidate ){
             this.disabled = true;
             const originalText = this.innerHTML;
             this.innerHTML = '<span>⏳</span> Processing...';
-            const isMySQLAction = action === 'toggle-mysql';
 
             // Prepare form data
             const formData = new FormData();
@@ -2488,13 +2268,7 @@ foreach( $faviconCandidates as $candidate ){
             .then(data => {
                 // Re-enable button
                 this.disabled = false;
-
-                // Update MySQL button status after toggle, otherwise restore original text
-                if (isMySQLAction) {
-                    updateMySQLButton();
-                } else {
-                    this.innerHTML = originalText;
-                }
+                this.innerHTML = originalText;
 
                 // Show modal with result
                 if (actionModal && actionOutput) {
@@ -2530,43 +2304,6 @@ foreach( $faviconCandidates as $candidate ){
             }
         });
     }
-
-    // Update MySQL button text based on server status
-    function updateMySQLButton() {
-        const mysqlButtons = document.querySelectorAll('[data-action="toggle-mysql"]');
-        if (mysqlButtons.length === 0) return;
-
-        const formData = new FormData();
-        formData.append('action', 'mysql-status');
-<?php if( !empty( $options['security']['enable_csrf'] ) ): ?>
-        formData.append('token', '<?= $_SESSION['csrf_token'] ?>');
-<?php endif; ?>
-
-        fetch(window.location.href, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                mysqlButtons.forEach(btn => {
-                    if (data.running) {
-                        btn.innerHTML = '<span>🛑</span> Stop MySQL';
-                        btn.title = 'Stop MySQL server';
-                    } else {
-                        btn.innerHTML = '<span>▶️</span> Start MySQL';
-                        btn.title = 'Start MySQL server';
-                    }
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Failed to check MySQL status:', error);
-        });
-    }
-
-    // Update MySQL button on page load
-    updateMySQLButton();
 
     // Helper function to escape HTML
     function escapeHtml(text) {
