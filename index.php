@@ -1035,12 +1035,12 @@ foreach( $faviconCandidates as $candidate ){
 
         main {
             display: grid;
-            grid-template-columns: 1fr minmax(280px, 400px);
+            grid-template-columns: minmax(0, 2.4fr) minmax(280px, 1fr);
             gap: 36px;
             width: 100%;
-            max-width: 1600px;
+            max-width: 1400px;
             margin: 8px auto 45px;
-            padding: 0 clamp(20px, 5vw, 80px);
+            padding: 0 clamp(20px, 4vw, 40px);
             color: var(--color-text);
         }
 
@@ -1112,10 +1112,10 @@ foreach( $faviconCandidates as $candidate ){
         .info,
         .stats {
             margin-bottom: 24px;
-            padding: 16px;
+            padding: 12px;
             background: rgba(255, 255, 255, 0.02);
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         }
 
         .info .table > div,
@@ -1223,10 +1223,10 @@ foreach( $faviconCandidates as $candidate ){
 
         .recent {
             margin-bottom: 24px;
-            padding: 16px;
+            padding: 12px;
             background: rgba(255, 255, 255, 0.02);
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         }
 
         .recent ul {
@@ -1283,11 +1283,11 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .projects {
-            padding: 16px 40px 16px 16px;
+            padding: 12px 24px 12px 12px;
             max-width: 100%;
             background: rgba(255, 255, 255, 0.02);
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         }
 
         .projects .content {
@@ -1389,10 +1389,10 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .tools {
-            padding: 16px;
+            padding: 12px;
             background: rgba(255, 255, 255, 0.02);
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         }
 
         .tools ul {
