@@ -5,6 +5,10 @@ A beautiful, self-contained localhost homepage for local development environment
 ![Version](https://img.shields.io/badge/version-1.3.2-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![GitHub stars](https://img.shields.io/github/stars/pier0074/LocalhostIndex?style=social)
+![GitHub forks](https://img.shields.io/github/forks/pier0074/LocalhostIndex?style=social)
+![Last Commit](https://img.shields.io/github/last-commit/pier0074/LocalhostIndex)
+![Downloads](https://img.shields.io/github/downloads/pier0074/LocalhostIndex/total)
 
 ## Features
 
