@@ -1510,6 +1510,9 @@ foreach( $faviconCandidates as $candidate ){
                 <span class="expand-text">+ more runtimes</span>
                 <span class="loading-text" style="display: none;">loading...</span>
             </button>
+            <button id="collapse-runtimes" class="expand-btn collapse-btn" style="display: none;" aria-label="Hide runtimes">
+                - hide
+            </button>
         </div>
 		<?php if( !empty( $options['extras'] ) ): ?>
             <div class="tools">
@@ -1731,8 +1734,12 @@ foreach( $faviconCandidates as $candidate ){
                         extendedInfo.style.display = 'block';
                     }
 
-                    // Hide button
+                    // Hide expand button, show collapse button
                     expandBtn.classList.add('expanded');
+                    const collapseBtn = document.getElementById('collapse-runtimes');
+                    if (collapseBtn) {
+                        collapseBtn.style.display = 'block';
+                    }
                     runtimesLoaded = true;
                 })
                 .catch(error => {
@@ -1742,6 +1749,16 @@ foreach( $faviconCandidates as $candidate ){
                     expandBtn.querySelector('.expand-text').textContent = '⚠ failed to load';
                     expandBtn.querySelector('.loading-text').style.display = 'none';
                 });
+        });
+    }
+
+    // Collapse runtimes button
+    const collapseBtn = document.getElementById('collapse-runtimes');
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', () => {
+            extendedInfo.style.display = 'none';
+            collapseBtn.style.display = 'none';
+            expandBtn.classList.remove('expanded');
         });
     }
 </script>
