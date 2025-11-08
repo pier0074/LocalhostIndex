@@ -733,7 +733,7 @@ foreach( $directoryList as $item ){
 // Stats: Preview (folded) and Extended (expanded)
 // Preview: Projects, Disk free, OS
 // Expanded Section 1 (Project Stats): Projects, Files, Last update
-// Expanded Section 2 (System Stats): Disk free, Total disk, Memory usage, Load average, CPU, Uptime, OS
+// Expanded Section 2 (System Stats): Disk free, Total disk, Memory, CPU, Uptime, OS
 // Expanded Section 3 (PHP Stats): PHP memory limit, PHP max upload, OPcache status
 // Expanded Section 4 (Server Stats): Apache connections, Active ports, Running processes
 $statsPreview = [];
@@ -775,36 +775,19 @@ if( $diskTotal !== false && $diskTotal > 0 ){
 	$statsSystemExpanded['Total disk'] = humanFileSize( $diskTotal );
 }
 
-// Memory usage (current vs total)
-if( PHP_OS_FAMILY === 'Darwin' ){
-	$memTotal = @shell_exec( 'sysctl -n hw.memsize' );
-	$memUsed = @shell_exec( "top -l 1 | grep PhysMem | awk '{print \$2}' | sed 's/M//' | awk '{print \$1*1024*1024}'" );
-
-	if( $memTotal ){
-		$memTotal = (int)trim( $memTotal );
-		if( $memUsed ){
-			$memUsed = (int)trim( $memUsed );
-			$memPercent = round( ( $memUsed / $memTotal ) * 100 );
-			$statsSystemExpanded['Memory usage'] = humanFileSize( $memUsed ) . ' / ' . humanFileSize( $memTotal ) . ' (' . $memPercent . '%)';
-		} else {
-			$statsSystemExpanded['Memory usage'] = humanFileSize( $memTotal );
-		}
-	}
-} elseif( PHP_OS_FAMILY === 'Linux' ){
-	$memInfo = @shell_exec( 'free -b | grep Mem' );
-	if( $memInfo && preg_match( '/Mem:\s+(\d+)\s+(\d+)/', $memInfo, $matches ) ){
-		$memTotal = (int)$matches[1];
-		$memUsed = (int)$matches[2];
-		$memPercent = round( ( $memUsed / $memTotal ) * 100 );
-		$statsSystemExpanded['Memory usage'] = humanFileSize( $memUsed ) . ' / ' . humanFileSize( $memTotal ) . ' (' . $memPercent . '%)';
-	}
-}
-
-// Load average
+// Memory
 if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
-	$loadAvg = @shell_exec( 'uptime' );
-	if( $loadAvg && preg_match( '/load averages?:\s+([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/', $loadAvg, $matches ) ){
-		$statsSystemExpanded['Load average'] = $matches[1] . ', ' . $matches[2] . ', ' . $matches[3];
+	$memInfo = @shell_exec( PHP_OS_FAMILY === 'Darwin' ? 'sysctl hw.memsize' : 'free -b | grep Mem' );
+	if( $memInfo ){
+		if( PHP_OS_FAMILY === 'Darwin' ){
+			if( preg_match( '/hw\.memsize:\s+(\d+)/', $memInfo, $matches ) ){
+				$statsSystemExpanded['Memory'] = humanFileSize( (int)$matches[1] );
+			}
+		} else {
+			if( preg_match( '/Mem:\s+(\d+)/', $memInfo, $matches ) ){
+				$statsSystemExpanded['Memory'] = humanFileSize( (int)$matches[1] );
+			}
+		}
 	}
 }
 
