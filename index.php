@@ -1112,6 +1112,10 @@ foreach( $faviconCandidates as $candidate ){
         .info,
         .stats {
             margin-bottom: 24px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .info .table > div,
@@ -1219,6 +1223,10 @@ foreach( $faviconCandidates as $candidate ){
 
         .recent {
             margin-bottom: 24px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .recent ul {
@@ -1243,6 +1251,7 @@ foreach( $faviconCandidates as $candidate ){
             text-decoration: none;
             border-radius: 3px;
             padding: 2px 4px;
+            transition: all 0.2s ease;
         }
 
         .recent ul li .name:hover,
@@ -1274,9 +1283,11 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .projects {
-            padding-right: 40px;
-            padding-left: 2px;
+            padding: 16px 40px 16px 16px;
             max-width: 100%;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .projects .content {
@@ -1344,6 +1355,7 @@ foreach( $faviconCandidates as $candidate ){
             padding: 2px 4px;
             flex: 1;
             min-width: 0;
+            transition: all 0.2s ease;
         }
 
         .projects ul li .file-size {
@@ -1377,6 +1389,10 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .tools {
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .tools ul {
@@ -1399,6 +1415,7 @@ foreach( $faviconCandidates as $candidate ){
             border-radius: 3px;
             font-size: 14px;
             padding: 2px 4px;
+            transition: all 0.2s ease;
         }
 
         .tools ul li a:hover {
