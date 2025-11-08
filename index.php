@@ -1693,11 +1693,20 @@ foreach( $faviconCandidates as $candidate ){
     // Expand runtimes button
     const expandBtn = document.getElementById('expand-runtimes');
     const extendedInfo = document.getElementById('extended-info');
+    const collapseBtn = document.getElementById('collapse-runtimes');
     let runtimesLoaded = false;
 
     if (expandBtn) {
         expandBtn.addEventListener('click', () => {
-            if (runtimesLoaded) return;
+            // If data already loaded, just show it
+            if (runtimesLoaded) {
+                extendedInfo.style.display = 'block';
+                expandBtn.classList.add('expanded');
+                if (collapseBtn) {
+                    collapseBtn.style.display = 'block';
+                }
+                return;
+            }
 
             // Show loading state
             expandBtn.classList.add('loading');
@@ -1735,8 +1744,10 @@ foreach( $faviconCandidates as $candidate ){
                     }
 
                     // Hide expand button, show collapse button
+                    expandBtn.classList.remove('loading');
+                    expandBtn.querySelector('.expand-text').style.display = 'inline';
+                    expandBtn.querySelector('.loading-text').style.display = 'none';
                     expandBtn.classList.add('expanded');
-                    const collapseBtn = document.getElementById('collapse-runtimes');
                     if (collapseBtn) {
                         collapseBtn.style.display = 'block';
                     }
@@ -1753,7 +1764,6 @@ foreach( $faviconCandidates as $candidate ){
     }
 
     // Collapse runtimes button
-    const collapseBtn = document.getElementById('collapse-runtimes');
     if (collapseBtn) {
         collapseBtn.addEventListener('click', () => {
             extendedInfo.style.display = 'none';
