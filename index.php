@@ -366,8 +366,9 @@ if( isset( $_POST['action'] ) ){
 
 		case 'mysql-status':
 			if( PHP_OS_FAMILY === 'Darwin' ){
-				$status = (string) @shell_exec( 'brew services list | grep mysql 2>&1' );
-				$isRunning = strpos( $status, 'started' ) !== false;
+				// Check if MySQL process is running
+				$ps = (string) @shell_exec( 'ps aux | grep mysqld | grep -v grep' );
+				$isRunning = strlen( trim( $ps ) ) > 0;
 			} else {
 				$status = (string) @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
 				$isRunning = trim( $status ) === 'active';
@@ -377,12 +378,31 @@ if( isset( $_POST['action'] ) ){
 
 		case 'toggle-mysql':
 			if( PHP_OS_FAMILY === 'Darwin' ){
-				$status = (string) @shell_exec( 'brew services list | grep mysql 2>&1' );
-				if( strpos( $status, 'started' ) !== false ){
-					$output = @shell_exec( 'brew services stop mysql 2>&1' );
+				// Check if MySQL process is running
+				$ps = (string) @shell_exec( 'ps aux | grep mysqld | grep -v grep' );
+				$isRunning = strlen( trim( $ps ) ) > 0;
+
+				if( $isRunning ){
+					// Try different stop methods
+					if( file_exists( '/usr/local/mysql/support-files/mysql.server' ) ){
+						$output = @shell_exec( '/usr/local/mysql/support-files/mysql.server stop 2>&1' );
+					} elseif( file_exists( '/usr/local/bin/mysql.server' ) ){
+						$output = @shell_exec( '/usr/local/bin/mysql.server stop 2>&1' );
+					} else {
+						// Try brew if available
+						$output = @shell_exec( 'brew services stop mysql 2>&1' );
+					}
 					$result = [ 'success' => true, 'message' => 'MySQL stopped', 'output' => $output ];
 				} else {
-					$output = @shell_exec( 'brew services start mysql 2>&1' );
+					// Try different start methods
+					if( file_exists( '/usr/local/mysql/support-files/mysql.server' ) ){
+						$output = @shell_exec( '/usr/local/mysql/support-files/mysql.server start 2>&1' );
+					} elseif( file_exists( '/usr/local/bin/mysql.server' ) ){
+						$output = @shell_exec( '/usr/local/bin/mysql.server start 2>&1' );
+					} else {
+						// Try brew if available
+						$output = @shell_exec( 'brew services start mysql 2>&1' );
+					}
 					$result = [ 'success' => true, 'message' => 'MySQL started', 'output' => $output ];
 				}
 			} else {
