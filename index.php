@@ -2370,8 +2370,8 @@ foreach( $faviconCandidates as $candidate ){
     // Action button handlers
     const actionButtons = document.querySelectorAll('.action-btn');
     const actionModal = document.getElementById('action-output');
-    const actionOutput = document.getElementById('action-result');
-    const closeModalBtn = document.querySelector('.close-modal');
+    const actionOutput = document.getElementById('action-output-content');
+    const closeModalBtn = document.getElementById('action-output-close');
 
     actionButtons.forEach(btn => {
         btn.addEventListener('click', function() {
@@ -2403,14 +2403,14 @@ foreach( $faviconCandidates as $candidate ){
 
                 // Show modal with result
                 if (actionModal && actionOutput) {
-                    let output = `<div style="margin-bottom: 10px;"><strong>${data.success ? '✅' : '❌'} ${data.message}</strong></div>`;
+                    let output = `<strong>${data.success ? '✅' : '❌'} ${data.message}</strong>`;
 
                     if (data.output) {
-                        output += `<div style="background: var(--input-bg); padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px; white-space: pre-wrap; overflow-x: auto;">${escapeHtml(data.output)}</div>`;
+                        output += `\n\n${escapeHtml(data.output)}`;
                     }
 
-                    actionOutput.innerHTML = output;
-                    actionModal.style.display = 'flex';
+                    actionOutput.textContent = output;
+                    actionModal.style.display = 'block';
                 }
             })
             .catch(error => {
@@ -2420,8 +2420,8 @@ foreach( $faviconCandidates as $candidate ){
 
                 // Show error in modal
                 if (actionModal && actionOutput) {
-                    actionOutput.innerHTML = `<div style="color: var(--color-accent);"><strong>❌ Error:</strong> ${escapeHtml(error.message)}</div>`;
-                    actionModal.style.display = 'flex';
+                    actionOutput.textContent = `❌ Error: ${error.message}`;
+                    actionModal.style.display = 'block';
                 }
             });
         });
@@ -2436,14 +2436,6 @@ foreach( $faviconCandidates as $candidate ){
         });
     }
 
-    // Close modal on outside click
-    if (actionModal) {
-        actionModal.addEventListener('click', function(e) {
-            if (e.target === actionModal) {
-                actionModal.style.display = 'none';
-            }
-        });
-    }
 
     // Helper function to escape HTML
     function escapeHtml(text) {
