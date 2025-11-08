@@ -801,7 +801,22 @@ if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
 if( PHP_OS_FAMILY === 'Darwin' ){
 	$osVersion = @shell_exec( 'sw_vers -productVersion' );
 	if( $osVersion ){
-		$systemStats['OS'] = 'macOS ' . trim( $osVersion );
+		$version = trim( $osVersion );
+		$versionParts = explode( '.', $version );
+		$majorVersion = (int)$versionParts[0];
+
+		// macOS version names
+		$versionNames = [
+			15 => 'Sequoia',
+			14 => 'Sonoma',
+			13 => 'Ventura',
+			12 => 'Monterey',
+			11 => 'Big Sur',
+			10 => 'Catalina/Mojave/High Sierra'
+		];
+
+		$versionName = $versionNames[$majorVersion] ?? 'macOS';
+		$systemStats['OS'] = "macOS {$version} ({$versionName})";
 	}
 } elseif( PHP_OS_FAMILY === 'Linux' ){
 	$osVersion = @shell_exec( "lsb_release -ds 2>/dev/null || cat /etc/*release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'" );
@@ -1705,7 +1720,10 @@ foreach( $faviconCandidates as $candidate ){
             </div>
         </div>
         <div class="info">
-            <h2>info</h2>
+            <div class="section-header">
+                <h2>info</h2>
+                <button class="toggle-btn" data-target="info-extended" data-ajax="runtimes" aria-label="Expand runtimes">+</button>
+            </div>
             <div class="table" id="basic-info">
 				<?php foreach( $info as $label => $value ): ?>
                     <div class="<?= $label ?>">
@@ -1714,14 +1732,9 @@ foreach( $faviconCandidates as $candidate ){
                     </div>
 				<?php endforeach; ?>
             </div>
-            <div id="extended-info" style="display: none;"></div>
-            <button id="expand-runtimes" class="expand-btn" aria-label="Show more runtimes">
-                <span class="expand-text">+ more runtimes</span>
-                <span class="loading-text" style="display: none;">loading...</span>
-            </button>
-            <button id="collapse-runtimes" class="expand-btn collapse-btn" style="display: none;" aria-label="Hide runtimes">
-                - hide
-            </button>
+            <div id="info-extended" class="extended-section" style="display: none;">
+                <div id="extended-info"></div>
+            </div>
         </div>
 		<?php if( !empty( $options['extras'] ) ): ?>
             <div class="tools">
@@ -1936,100 +1949,57 @@ foreach( $faviconCandidates as $candidate ){
         });
     });
 
-    // Expand runtimes button
-    const expandBtn = document.getElementById('expand-runtimes');
-    const extendedInfo = document.getElementById('extended-info');
-    const collapseBtn = document.getElementById('collapse-runtimes');
+    // Toggle buttons for stats, actions, and info
     let runtimesLoaded = false;
-
-    if (expandBtn) {
-        expandBtn.addEventListener('click', () => {
-            // If data already loaded, just show it
-            if (runtimesLoaded) {
-                extendedInfo.style.display = 'block';
-                expandBtn.classList.add('expanded');
-                if (collapseBtn) {
-                    collapseBtn.style.display = 'block';
-                }
-                return;
-            }
-
-            // Show loading state
-            expandBtn.classList.add('loading');
-            expandBtn.querySelector('.expand-text').style.display = 'none';
-            expandBtn.querySelector('.loading-text').style.display = 'inline';
-
-            // Build URL with CSRF token if needed
-            const url = new URL(window.location.href);
-            url.searchParams.set('action', 'detect_runtimes');
-<?php if( !empty( $options['security']['enable_csrf'] ) ): ?>
-            url.searchParams.set('token', '<?= $_SESSION['csrf_token'] ?>');
-<?php endif; ?>
-
-            // Fetch extended runtimes
-            fetch(url.toString())
-                .then(response => response.json())
-                .then(data => {
-                    // Remove basic info that's already displayed
-                    const basicKeys = ['Apache', 'PHP', 'MySQL'];
-                    const extended = Object.entries(data).filter(([key]) => !basicKeys.includes(key));
-
-                    if (extended.length > 0) {
-                        // Build HTML for extended runtimes
-                        const html = '<div class="table">' +
-                            extended.map(([label, value]) =>
-                                `<div class="${label}">` +
-                                `<span>${label}</span>` +
-                                `<span>${value}</span>` +
-                                `</div>`
-                            ).join('') +
-                            '</div>';
-
-                        extendedInfo.innerHTML = html;
-                        extendedInfo.style.display = 'block';
-                    }
-
-                    // Hide expand button, show collapse button
-                    expandBtn.classList.remove('loading');
-                    expandBtn.querySelector('.expand-text').style.display = 'inline';
-                    expandBtn.querySelector('.loading-text').style.display = 'none';
-                    expandBtn.classList.add('expanded');
-                    if (collapseBtn) {
-                        collapseBtn.style.display = 'block';
-                    }
-                    runtimesLoaded = true;
-                })
-                .catch(error => {
-                    console.error('Failed to load runtimes:', error);
-                    expandBtn.classList.remove('loading');
-                    expandBtn.querySelector('.expand-text').style.display = 'inline';
-                    expandBtn.querySelector('.expand-text').textContent = '⚠ failed to load';
-                    expandBtn.querySelector('.loading-text').style.display = 'none';
-                });
-        });
-    }
-
-    // Collapse runtimes button
-    if (collapseBtn) {
-        collapseBtn.addEventListener('click', () => {
-            extendedInfo.style.display = 'none';
-            collapseBtn.style.display = 'none';
-            expandBtn.classList.remove('expanded');
-        });
-    }
-
-    // Toggle buttons for stats and actions
     document.querySelectorAll('.toggle-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const targetId = this.getAttribute('data-target');
             const target = document.getElementById(targetId);
+            const ajax = this.getAttribute('data-ajax');
 
             if (target) {
                 if (target.style.display === 'none') {
+                    // Expanding
                     target.style.display = 'block';
                     this.textContent = '−';
                     this.setAttribute('aria-label', 'Collapse section');
+
+                    // Load runtimes via AJAX if needed
+                    if (ajax === 'runtimes' && !runtimesLoaded) {
+                        const extendedInfo = document.getElementById('extended-info');
+                        if (extendedInfo) {
+                            extendedInfo.innerHTML = '<div style="text-align:center;padding:10px;color:var(--color-muted);">loading...</div>';
+
+                            const url = new URL(window.location.href);
+                            url.searchParams.set('action', 'detect_runtimes');
+<?php if( !empty( $options['security']['enable_csrf'] ) ): ?>
+                            url.searchParams.set('token', '<?= $_SESSION['csrf_token'] ?>');
+<?php endif; ?>
+
+                            fetch(url.toString())
+                                .then(response => response.json())
+                                .then(data => {
+                                    const basicKeys = ['Apache', 'PHP', 'MySQL'];
+                                    const extended = Object.entries(data)
+                                        .filter(([key]) => !basicKeys.includes(key))
+                                        .map(([label, value]) => {
+                                            const escapedLabel = label.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                            const escapedValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                            return `<div><span>${escapedLabel}</span><span>${escapedValue}</span></div>`;
+                                        })
+                                        .join('');
+
+                                    extendedInfo.innerHTML = extended ? `<div class="table">${extended}</div>` : '<div style="text-align:center;padding:10px;color:var(--color-muted);">No additional runtimes detected</div>';
+                                    runtimesLoaded = true;
+                                })
+                                .catch(error => {
+                                    console.error('Failed to load runtimes:', error);
+                                    extendedInfo.innerHTML = '<div style="text-align:center;padding:10px;color:var(--color-muted);">⚠ Failed to load</div>';
+                                });
+                        }
+                    }
                 } else {
+                    // Collapsing
                     target.style.display = 'none';
                     this.textContent = '+';
                     this.setAttribute('aria-label', 'Expand section');
