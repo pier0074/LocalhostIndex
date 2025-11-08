@@ -449,27 +449,19 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 		);
 	}
 
+	// Most common MySQL paths (ordered by likelihood on macOS/Linux)
 	$default_binaries = [
-		'mysql',
-		'mysqld',
+		'/usr/local/mysql/bin/mysql',
+		'/opt/homebrew/bin/mysql',
 		'/usr/local/bin/mysql',
 		'/usr/bin/mysql',
-		'/opt/homebrew/bin/mysql',
-		'/usr/local/mysql/bin/mysql',
 		'/opt/local/bin/mysql',
+		'mysql',
 		'/usr/local/mysql/bin/mysqld',
 		'/usr/sbin/mysqld',
-		'/usr/libexec/mysqld'
+		'/usr/libexec/mysqld',
+		'mysqld'
 	];
-
-	if( $shell_available ){
-		foreach( [ 'command -v mysql', 'which mysql', 'command -v mysqld', 'which mysqld' ] as $probe ){
-			$probe_result = trim( (string) shell_exec( $probe . ' 2>/dev/null' ) );
-			if( $probe_result !== '' ){
-				$binary_candidates[] = $probe_result;
-			}
-		}
-	}
 
 	$binary_candidates = array_values(
 		array_unique(
@@ -481,7 +473,8 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 	);
 
 	if( $shell_available ){
-		foreach( $binary_candidates as $binary ){
+		// Try first 5 candidates for better detection while keeping good performance
+		foreach( array_slice( $binary_candidates, 0, 5 ) as $binary ){
 			$binary = trim( (string) $binary );
 			if( $binary === '' ){
 				continue;
@@ -577,31 +570,35 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 	$password = $password !== null ? (string) $password : '';
 
 	if( !empty( $user ) || $socket !== null ){
-		$mysqli = mysqli_init();
-		if( $mysqli ){
-			if( defined( 'MYSQLI_OPT_CONNECT_TIMEOUT' ) ){
-				mysqli_options( $mysqli, MYSQLI_OPT_CONNECT_TIMEOUT, $timeout );
-			}
-			// Suppress connection errors as this is detection, not critical functionality
-			$connected = @mysqli_real_connect(
-				$mysqli,
-				$host,
-				$user,
-				$password,
-				$database,
-				$port,
-				$socket
-			);
-			if( $connected ){
-				$server_info = mysqli_get_server_info( $mysqli );
-				mysqli_close( $mysqli );
-				if( !empty( $server_info ) ){
-					if( preg_match( '/([0-9]+\\.[0-9]+\\.[0-9]+)/', $server_info, $matches ) ){
-						return $matches[1];
+		try {
+			$mysqli = mysqli_init();
+			if( $mysqli ){
+				if( defined( 'MYSQLI_OPT_CONNECT_TIMEOUT' ) ){
+					mysqli_options( $mysqli, MYSQLI_OPT_CONNECT_TIMEOUT, $timeout );
+				}
+				// Suppress connection errors as this is detection, not critical functionality
+				$connected = @mysqli_real_connect(
+					$mysqli,
+					$host,
+					$user,
+					$password,
+					$database,
+					$port,
+					$socket
+				);
+				if( $connected ){
+					$server_info = mysqli_get_server_info( $mysqli );
+					mysqli_close( $mysqli );
+					if( !empty( $server_info ) ){
+						if( preg_match( '/([0-9]+\\.[0-9]+\\.[0-9]+)/', $server_info, $matches ) ){
+							return $matches[1];
+						}
+						return $server_info;
 					}
-					return $server_info;
 				}
 			}
+		} catch( mysqli_sql_exception $e ){
+			// Silently ignore MySQL connection failures - this is optional detection
 		}
 	}
 
@@ -653,6 +650,44 @@ function formatRelativeTime( $timestamp ) {
 }
 
 /**
+ * Calculate directory size recursively (with depth limit for performance)
+ */
+function getDirectorySize( $path, $maxDepth = 3, $currentDepth = 0 ) {
+	$size = 0;
+
+	// Stop if we've gone too deep (prevent performance issues)
+	if( $currentDepth >= $maxDepth ){
+		return $size;
+	}
+
+	if( !is_dir( $path ) || !is_readable( $path ) ){
+		return $size;
+	}
+
+	$handle = @opendir( $path );
+	if( !$handle ){
+		return $size;
+	}
+
+	while( ( $item = readdir( $handle ) ) !== false ){
+		if( $item === '.' || $item === '..' ){
+			continue;
+		}
+
+		$itemPath = $path . '/' . $item;
+
+		if( is_file( $itemPath ) ){
+			$size += filesize( $itemPath );
+		} elseif( is_dir( $itemPath ) ){
+			$size += getDirectorySize( $itemPath, $maxDepth, $currentDepth + 1 );
+		}
+	}
+
+	closedir( $handle );
+	return $size;
+}
+
+/**
  * Get cached directory listing or scan directory
  */
 function getDirectoryListing( $options ) {
@@ -691,16 +726,15 @@ function getDirectoryListing( $options ) {
 			$isDir = is_dir( $path );
 			$itemType = $isDir ? 'dir' : 'file';
 
+			// Calculate size (for directories, calculate recursively with depth limit)
+			$size = $isDir ? getDirectorySize( $path ) : filesize( $path );
+
 			$itemData = [
 				'name' => $item,
 				'type' => $itemType,
 				'mtime' => filemtime( $path ),
+				'size' => $size,
 			];
-
-			// Add file size for files
-			if( !$isDir ){
-				$itemData['size'] = filesize( $path );
-			}
 
 			$directoryList[] = $itemData;
 		}
@@ -1314,6 +1348,11 @@ foreach( $faviconCandidates as $candidate ){
             font-weight: bold;
         }
 
+        .sort-btn.active.reversed::after {
+            content: ' ↓';
+            font-size: 0.9em;
+        }
+
         .sort-btn:focus-visible {
             outline: 2px solid var(--color-accent);
             outline-offset: 2px;
@@ -1830,7 +1869,10 @@ foreach( $faviconCandidates as $candidate ){
 					$showSize = $options['display']['show_file_sizes'] ?? true;
 					$size = isset( $item['size'] ) && $showSize ? humanFileSize( $item['size'] ) : '';
 				?>
-                    <li class="<?= $item['type'] ?>" data-name="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
+                    <li class="<?= $item['type'] ?>"
+                        data-name="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>"
+                        data-modified="<?= $item['mtime'] ?? 0 ?>"
+                        data-size="<?= $item['size'] ?? 0 ?>">
                         <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
 							<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
                         </a>
@@ -2125,16 +2167,78 @@ foreach( $faviconCandidates as $candidate ){
         });
     });
 
-    // Sort button handlers
+    // Sort button handlers (client-side, instant sorting with reverse)
     const sortButtons = document.querySelectorAll('.sort-btn');
-    sortButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const sortType = btn.dataset.sort;
-            const url = new URL(window.location);
-            url.searchParams.set('sort', sortType);
-            window.location.href = url.toString();
+    const projectList = document.querySelector('.projects .content ul');
+    let currentSort = null;
+    let isReversed = false;
+
+    if (projectList) {
+        sortButtons.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const sortType = btn.dataset.sort;
+
+                // Check if clicking the same button (toggle reverse)
+                if (currentSort === sortType) {
+                    isReversed = !isReversed;
+                } else {
+                    isReversed = false;
+                    currentSort = sortType;
+                }
+
+                // Update active state
+                sortButtons.forEach(b => {
+                    b.classList.remove('active');
+                    b.classList.remove('reversed');
+                });
+                btn.classList.add('active');
+                if (isReversed) {
+                    btn.classList.add('reversed');
+                }
+
+                // Get all list items
+                const items = Array.from(projectList.children);
+
+                // Sort items
+                items.sort((a, b) => {
+                    // For name sorting: directories before files
+                    // For date/size sorting: mix directories and files together
+                    if (sortType === 'name') {
+                        const typeA = a.classList.contains('dir') ? 0 : 1;
+                        const typeB = b.classList.contains('dir') ? 0 : 1;
+                        if (typeA !== typeB) {
+                            return typeA - typeB;
+                        }
+                    }
+
+                    // Sort by the selected criterion
+                    let result = 0;
+                    if (sortType === 'name') {
+                        const nameA = (a.dataset.name || '').toLowerCase();
+                        const nameB = (b.dataset.name || '').toLowerCase();
+                        result = nameA.localeCompare(nameB);
+                    } else if (sortType === 'date') {
+                        const dateA = parseInt(a.dataset.modified || '0');
+                        const dateB = parseInt(b.dataset.modified || '0');
+                        result = dateB - dateA; // Newest first by default
+                    } else if (sortType === 'size') {
+                        const sizeA = parseInt(a.dataset.size || '0');
+                        const sizeB = parseInt(b.dataset.size || '0');
+                        result = sizeB - sizeA; // Largest first by default
+                    }
+
+                    // Reverse if needed
+                    return isReversed ? -result : result;
+                });
+
+                // Clear and re-append in sorted order
+                projectList.innerHTML = '';
+                items.forEach(item => projectList.appendChild(item));
+            });
         });
-    });
+    }
 
     // Toggle buttons for stats, actions, and info
     let runtimesLoaded = false;
