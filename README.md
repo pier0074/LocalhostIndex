@@ -2,7 +2,7 @@
 
 A beautiful, self-contained localhost homepage for local development environments. Display all your projects, server info, and quick links in one elegant interface.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -11,12 +11,16 @@ A beautiful, self-contained localhost homepage for local development environment
 - 📂 **Directory Browser** - Automatically scans and displays all projects/folders
 - 🎨 **10 Beautiful Themes** - Switch between bluey, sunny, forest, retro, matrix, nebula, sundown, mono, dark, and light
 - 🔍 **Instant Search** - Filter projects with live search and Enter-to-navigate
+- 🔀 **Sorting Options** - Sort by name, date modified, or file size ✨ NEW
+- 💾 **File Sizes** - Display file sizes in human-readable format ✨ NEW
+- ⚡ **Smart Caching** - 60-second cache for improved performance ✨ NEW
 - 📊 **Server Dashboard** - Shows Apache, PHP, and MySQL versions
 - 📈 **Statistics** - Project count, file count, disk usage, and last update info
 - ⏱️ **Recent Activity** - Displays 5 most recently modified files/folders
 - 🔗 **Quick Links** - Configurable shortcuts to phpMyAdmin, phpinfo, or custom tools
 - 📱 **Responsive Design** - Works beautifully on desktop and mobile
 - ♿ **Accessible** - Keyboard navigation and ARIA labels
+- 🔐 **Security Hardened** - CSRF protection, path validation, optional authentication
 - 💾 **Theme Persistence** - Remembers your theme preference via localStorage
 
 ## Installation
@@ -41,7 +45,7 @@ Edit the `$options` array at the top of `index.php`:
 
 ```php
 $options = [
-    // Choose a theme: bluey, pinky, purply, sunny, forest, retro, matrix, nebula, sundown, monochrome, dark, light
+    // Choose a theme: bluey, sunny, forest, retro, matrix, nebula, sundown, monochrome, dark, light
     'theme' => 'bluey',
 
     // Exclude files or folders using wildcard patterns
@@ -68,6 +72,22 @@ $options = [
             'password' => '',
             'port' => 3306,
         ]
+    ],
+
+    // Display settings (v1.2.0+)
+    'display' => [
+        'show_file_sizes' => true,      // Show file sizes
+        'default_sort' => 'name',       // Default sort: name, date, size
+        'enable_cache' => true,         // Enable 60s cache
+    ],
+
+    // Security settings (v1.1.0+)
+    'security' => [
+        'enable_authentication' => false,
+        'password' => '',               // Bcrypt hash
+        'disable_phpinfo' => false,
+        'enable_csrf' => true,
+        'strict_path_validation' => true,
     ]
 ];
 ```
@@ -262,6 +282,35 @@ The entire application is intentionally in one `index.php` file for:
 - **Easy Updates** - Replace one file to upgrade
 
 ## Version History
+
+### v1.2.0 (2025-01-08) - User Experience & Performance Release
+
+**New Features**:
+- ✨ **Sorting Options** - Sort files by name, date modified, or size
+- ✨ **File Size Display** - Shows human-readable file sizes for all files
+- ✨ **Smart Caching** - 60-second cache improves performance with many files
+- 🎨 **Sorting UI** - Beautiful sort buttons with active state indicators
+- ⚙️ **Display Configuration** - New `$options['display']` settings
+
+**Code Quality Improvements**:
+- ✅ Strict input validation for phpinfo parameter
+- ✅ Magic numbers converted to constants (CACHE_TTL, etc.)
+- ✅ Apache version detection with fallback for non-Apache servers
+- ✅ Consistent camelCase naming convention throughout
+- ✅ Improved code maintainability and readability
+
+**Technical Details**:
+- Cache stored in system temp directory with MD5 hash
+- Cache automatically expires after 60 seconds
+- Sorting persists via URL parameter (?sort=name/date/size)
+- File sizes calculated during directory scan
+
+**Performance**:
+- 📈 Faster page loads with caching enabled
+- 📉 Reduced filesystem operations
+- ⚡ Optimized directory scanning
+
+**Breaking Changes**: None (fully backward compatible)
 
 ### v1.1.0 (2025-01-08) - Security Hardening Release
 
