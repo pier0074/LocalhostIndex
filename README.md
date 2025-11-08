@@ -2,7 +2,7 @@
 
 A beautiful, self-contained localhost homepage for local development environments. Display all your projects, server info, and quick links in one elegant interface.
 
-![Version](https://img.shields.io/badge/version-1.3.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.1-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -284,10 +284,35 @@ The entire application is intentionally in one `index.php` file for:
 
 ## Version History
 
+### v1.3.1 (2025-01-08) - Performance Optimization
+
+**Performance Improvements**:
+- ⚡ **Instant Page Load** - Basic info (Apache, PHP, MySQL) loads immediately (<500ms)
+- 🚀 **Lazy Loading** - Extended runtimes load only on demand via expand button
+- 📡 **AJAX Endpoint** - Asynchronous runtime detection without blocking page
+- 🎯 **Smart UX** - "+ more runtimes" button with loading indicator
+
+**Technical Changes**:
+- Split `detectRuntimes()` into fast `detectBasicInfo()` and full detection
+- Added AJAX endpoint `?action=detect_runtimes` for on-demand loading
+- JavaScript fetch API for async runtime loading
+- CSRF-protected AJAX requests
+- Dynamic DOM injection of extended info
+
+**User Experience**:
+- Page loads instantly instead of 2-3 second wait
+- Users who don't need extended info never trigger slow detection
+- Smooth loading state with spinner
+- Error handling with user feedback
+
+**Breaking Changes**: None (fully backward compatible)
+
 ### v1.3.0 (2025-01-08) - Multi-Runtime Detection Release
 
 **New Features**:
 - 🔧 **Universal Runtime Detection** - Auto-detects development tools by sourcing user's shell profile
+- ⚡ **Lazy Loading** - Fast page load: shows Apache/PHP/MySQL instantly, loads other runtimes on demand
+- 🎯 **Expand Button** - "+ more runtimes" button with loading indicator for additional tools
 - 🐍 **Python & pip** - Detects correct Python/pip versions (including pyenv, conda, virtualenv)
 - 📦 **Node.js & npm** - Detects Node.js and npm (including nvm installations)
 - 💎 **Ruby** - Auto-detects Ruby version (including rbenv, rvm)
@@ -311,9 +336,11 @@ The entire application is intentionally in one `index.php` file for:
 - ✅ All major version managers supported
 
 **Performance**:
-- ⚡ Minimal overhead - detection runs once per page load
-- 🔒 Safe execution - checks for disabled functions
-- 📊 Dynamic display - UI adapts to detected runtimes
+- ⚡ **Instant Page Load** - Basic info (Apache, PHP, MySQL) loads immediately
+- 🚀 **On-Demand Detection** - Extended runtimes load only when user clicks expand button
+- 📡 **AJAX Loading** - Additional runtimes fetched asynchronously without blocking page
+- 🔒 **Safe Execution** - Checks for disabled functions before shell execution
+- 📊 **Dynamic Display** - UI adapts to detected runtimes
 
 **Breaking Changes**: None (fully backward compatible)
 
