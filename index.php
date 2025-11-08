@@ -1778,9 +1778,9 @@ foreach( $faviconCandidates as $candidate ){
             <div class="stats">
                 <div class="section-header">
                     <h2>stats</h2>
-                    <button class="toggle-btn" data-target="stats-extended" aria-label="Expand stats">+</button>
+                    <button class="toggle-btn" data-target="stats-extended" data-preview="stats-preview" aria-label="Expand stats">+</button>
                 </div>
-                <div class="table">
+                <div id="stats-preview" class="table">
 					<?php foreach( $statsPreview as $label => $value ): ?>
                         <div>
                             <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
@@ -1791,7 +1791,7 @@ foreach( $faviconCandidates as $candidate ){
 				<?php if( !empty( $statsProjectExpanded ) || !empty( $statsSystemExpanded ) ): ?>
                 <div id="stats-extended" style="display: none;">
 					<?php if( !empty( $statsProjectExpanded ) ): ?>
-                        <div class="table" style="margin-top: calc(var(--spacing-unit) * 2);">
+                        <div class="table">
 							<?php foreach( $statsProjectExpanded as $label => $value ): ?>
                                 <div>
                                     <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
@@ -2008,6 +2008,7 @@ foreach( $faviconCandidates as $candidate ){
             const targetId = this.getAttribute('data-target');
             const target = document.getElementById(targetId);
             const ajax = this.getAttribute('data-ajax');
+            const previewId = this.getAttribute('data-preview');
 
             if (target) {
                 if (target.style.display === 'none') {
@@ -2015,6 +2016,14 @@ foreach( $faviconCandidates as $candidate ){
                     target.style.display = 'block';
                     this.textContent = '−';
                     this.setAttribute('aria-label', 'Collapse section');
+
+                    // Hide preview if it exists
+                    if (previewId) {
+                        const preview = document.getElementById(previewId);
+                        if (preview) {
+                            preview.style.display = 'none';
+                        }
+                    }
 
                     // Load runtimes via AJAX if needed
                     if (ajax === 'runtimes' && !runtimesLoaded) {
@@ -2055,6 +2064,14 @@ foreach( $faviconCandidates as $candidate ){
                     target.style.display = 'none';
                     this.textContent = '+';
                     this.setAttribute('aria-label', 'Expand section');
+
+                    // Show preview if it exists
+                    if (previewId) {
+                        const preview = document.getElementById(previewId);
+                        if (preview) {
+                            preview.style.display = 'block';
+                        }
+                    }
                 }
             }
         });
