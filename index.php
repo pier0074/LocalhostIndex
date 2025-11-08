@@ -462,14 +462,8 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 		'/usr/libexec/mysqld'
 	];
 
-	if( $shell_available ){
-		foreach( [ 'command -v mysql', 'which mysql', 'command -v mysqld', 'which mysqld' ] as $probe ){
-			$probe_result = trim( (string) shell_exec( $probe . ' 2>/dev/null' ) );
-			if( $probe_result !== '' ){
-				$binary_candidates[] = $probe_result;
-			}
-		}
-	}
+	// Skip slow shell probes - just use default binaries and user-provided paths
+	// This improves page load performance significantly
 
 	$binary_candidates = array_values(
 		array_unique(
@@ -481,7 +475,8 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 	);
 
 	if( $shell_available ){
-		foreach( $binary_candidates as $binary ){
+		// Limit to first 3 candidates for performance (reduce shell_exec calls)
+		foreach( array_slice( $binary_candidates, 0, 3 ) as $binary ){
 			$binary = trim( (string) $binary );
 			if( $binary === '' ){
 				continue;
@@ -695,12 +690,8 @@ function getDirectoryListing( $options ) {
 				'name' => $item,
 				'type' => $itemType,
 				'mtime' => filemtime( $path ),
+				'size' => $isDir ? 0 : filesize( $path ),
 			];
-
-			// Add file size for files
-			if( !$isDir ){
-				$itemData['size'] = filesize( $path );
-			}
 
 			$directoryList[] = $itemData;
 		}
@@ -1830,7 +1821,10 @@ foreach( $faviconCandidates as $candidate ){
 					$showSize = $options['display']['show_file_sizes'] ?? true;
 					$size = isset( $item['size'] ) && $showSize ? humanFileSize( $item['size'] ) : '';
 				?>
-                    <li class="<?= $item['type'] ?>" data-name="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
+                    <li class="<?= $item['type'] ?>"
+                        data-name="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>"
+                        data-modified="<?= $item['mtime'] ?? 0 ?>"
+                        data-size="<?= $item['size'] ?? 0 ?>">
                         <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
 							<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
                         </a>
@@ -2125,16 +2119,56 @@ foreach( $faviconCandidates as $candidate ){
         });
     });
 
-    // Sort button handlers
+    // Sort button handlers (client-side, instant sorting)
     const sortButtons = document.querySelectorAll('.sort-btn');
-    sortButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const sortType = btn.dataset.sort;
-            const url = new URL(window.location);
-            url.searchParams.set('sort', sortType);
-            window.location.href = url.toString();
+    const projectList = document.querySelector('.projects .content ul');
+
+    if (projectList) {
+        sortButtons.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const sortType = btn.dataset.sort;
+
+                // Update active state
+                sortButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Get all list items
+                const items = Array.from(projectList.children);
+
+                // Sort items
+                items.sort((a, b) => {
+                    // Always sort directories before files
+                    const typeA = a.classList.contains('dir') ? 0 : 1;
+                    const typeB = b.classList.contains('dir') ? 0 : 1;
+                    if (typeA !== typeB) {
+                        return typeA - typeB;
+                    }
+
+                    // Then sort by the selected criterion
+                    if (sortType === 'name') {
+                        const nameA = (a.dataset.name || '').toLowerCase();
+                        const nameB = (b.dataset.name || '').toLowerCase();
+                        return nameA.localeCompare(nameB);
+                    } else if (sortType === 'date') {
+                        const dateA = parseInt(a.dataset.modified || '0');
+                        const dateB = parseInt(b.dataset.modified || '0');
+                        return dateB - dateA; // Newest first
+                    } else if (sortType === 'size') {
+                        const sizeA = parseInt(a.dataset.size || '0');
+                        const sizeB = parseInt(b.dataset.size || '0');
+                        return sizeB - sizeA; // Largest first
+                    }
+                    return 0;
+                });
+
+                // Clear and re-append in sorted order
+                projectList.innerHTML = '';
+                items.forEach(item => projectList.appendChild(item));
+            });
         });
-    });
+    }
 
     // Toggle buttons for stats, actions, and info
     let runtimesLoaded = false;
