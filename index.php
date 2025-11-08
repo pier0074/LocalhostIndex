@@ -1240,11 +1240,28 @@ foreach( $faviconCandidates as $candidate ){
             color: var(--color-secondary);
             margin-right: 16px;
             word-break: break-word;
+            text-decoration: none;
+            border-radius: 3px;
+            padding: 2px 4px;
+        }
+
+        .recent ul li .name:hover,
+        .recent ul li .name:focus {
+            background-color: var(--color-secondary);
+            color: var(--color-bkg);
+            outline: none;
         }
 
         .recent ul li.dir .name {
             color: var(--color-accent);
             font-weight: bold;
+        }
+
+        .recent ul li.dir .name:hover,
+        .recent ul li.dir .name:focus {
+            background-color: var(--color-accent);
+            color: var(--color-bkg);
+            outline: none;
         }
 
         .recent ul li small {
@@ -1493,6 +1510,9 @@ foreach( $faviconCandidates as $candidate ){
                 <span class="expand-text">+ more runtimes</span>
                 <span class="loading-text" style="display: none;">loading...</span>
             </button>
+            <button id="collapse-runtimes" class="expand-btn collapse-btn" style="display: none;" aria-label="Hide runtimes">
+                - hide
+            </button>
         </div>
 		<?php if( !empty( $options['extras'] ) ): ?>
             <div class="tools">
@@ -1530,7 +1550,9 @@ foreach( $faviconCandidates as $candidate ){
                 <ul>
 					<?php foreach( $recentItems as $item ): ?>
                         <li class="<?= htmlspecialchars( $item['type'], ENT_QUOTES, 'UTF-8' ); ?>">
-                            <span class="name"><?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?></span>
+                            <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>" class="name">
+								<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
+                            </a>
                             <small title="<?= htmlspecialchars( $item['absolute'], ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $item['relative'], ENT_QUOTES, 'UTF-8' ); ?></small>
                         </li>
 					<?php endforeach; ?>
@@ -1671,11 +1693,20 @@ foreach( $faviconCandidates as $candidate ){
     // Expand runtimes button
     const expandBtn = document.getElementById('expand-runtimes');
     const extendedInfo = document.getElementById('extended-info');
+    const collapseBtn = document.getElementById('collapse-runtimes');
     let runtimesLoaded = false;
 
     if (expandBtn) {
         expandBtn.addEventListener('click', () => {
-            if (runtimesLoaded) return;
+            // If data already loaded, just show it
+            if (runtimesLoaded) {
+                extendedInfo.style.display = 'block';
+                expandBtn.classList.add('expanded');
+                if (collapseBtn) {
+                    collapseBtn.style.display = 'block';
+                }
+                return;
+            }
 
             // Show loading state
             expandBtn.classList.add('loading');
@@ -1712,8 +1743,14 @@ foreach( $faviconCandidates as $candidate ){
                         extendedInfo.style.display = 'block';
                     }
 
-                    // Hide button
+                    // Hide expand button, show collapse button
+                    expandBtn.classList.remove('loading');
+                    expandBtn.querySelector('.expand-text').style.display = 'inline';
+                    expandBtn.querySelector('.loading-text').style.display = 'none';
                     expandBtn.classList.add('expanded');
+                    if (collapseBtn) {
+                        collapseBtn.style.display = 'block';
+                    }
                     runtimesLoaded = true;
                 })
                 .catch(error => {
@@ -1723,6 +1760,15 @@ foreach( $faviconCandidates as $candidate ){
                     expandBtn.querySelector('.expand-text').textContent = '⚠ failed to load';
                     expandBtn.querySelector('.loading-text').style.display = 'none';
                 });
+        });
+    }
+
+    // Collapse runtimes button
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', () => {
+            extendedInfo.style.display = 'none';
+            collapseBtn.style.display = 'none';
+            expandBtn.classList.remove('expanded');
         });
     }
 </script>
