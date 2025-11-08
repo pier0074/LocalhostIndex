@@ -7,6 +7,11 @@
  * Set 'enable_security' => true if deploying on shared/public servers.
  */
 
+// Configuration constants
+define( 'CSRF_TOKEN_LENGTH', 32 );        // Length of CSRF token in bytes
+define( 'MYSQL_TIMEOUT', 2 );             // MySQL connection timeout in seconds
+define( 'RECENT_ITEMS_LIMIT', 5 );        // Number of recent items to display
+
 $options = [
 	/**
 	 * Set the theme
@@ -75,7 +80,7 @@ session_start();
 
 // Security: Generate CSRF token
 if( !isset( $_SESSION['csrf_token'] ) ){
-	$_SESSION['csrf_token'] = bin2hex( random_bytes( 32 ) );
+	$_SESSION['csrf_token'] = bin2hex( random_bytes( CSRF_TOKEN_LENGTH ) );
 }
 
 // Security: Simple authentication check
@@ -152,7 +157,7 @@ function validatePath( $filename, $strict = true ) {
 }
 
 // display phpinfo with CSRF protection
-if( !empty( $_GET['phpinfo'] ) ){
+if( isset( $_GET['phpinfo'] ) && $_GET['phpinfo'] === '1' ){
 	// Check if phpinfo is disabled
 	if( !empty( $options['security']['disable_phpinfo'] ) ){
 		http_response_code( 403 );
@@ -172,16 +177,25 @@ if( !empty( $_GET['phpinfo'] ) ){
 }
 
 // server info
-$apache_version = explode( ' ', explode( '/', apache_get_version() )[1] )[0];
-$php_version = explode( '-', phpversion() )[0];
+$apacheVersion = 'Unknown';
+if( function_exists( 'apache_get_version' ) ){
+	$versionString = apache_get_version();
+	if( $versionString !== false ){
+		$parts = explode( '/', $versionString );
+		if( isset( $parts[1] ) ){
+			$apacheVersion = explode( ' ', $parts[1] )[0];
+		}
+	}
+}
+$phpVersion = explode( '-', phpversion() )[0];
 
 
-$mysql_version = detectMysqlVersion( $options['mysql'] ?? [] );
+$mysqlVersion = detectMysqlVersion( $options['mysql'] ?? [] );
 
 $info = [
-	'Apache' => $apache_version,
-	'PHP' => $php_version,
-	'MySQL' => $mysql_version
+	'Apache' => $apacheVersion,
+	'PHP' => $phpVersion,
+	'MySQL' => $mysqlVersion
 ];
 
 // match a given filename against an array of patterns
@@ -282,7 +296,7 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 	$user = $connection['user'] ?? $connection['username'] ?? ini_get( 'mysqli.default_user' );
 	$password = $connection['password'] ?? $connection['pass'] ?? $connection['pw'] ?? ini_get( 'mysqli.default_pw' );
 	$database = $connection['database'] ?? $connection['dbname'] ?? null;
-	$timeout = isset( $connection['timeout'] ) ? (int) $connection['timeout'] : 2;
+	$timeout = isset( $connection['timeout'] ) ? (int) $connection['timeout'] : MYSQL_TIMEOUT;
 
 	$env_user = getenv( 'DB_USER' )
 		?: getenv( 'MYSQL_USER' )
@@ -427,30 +441,30 @@ function formatRelativeTime( $timestamp ) {
 }
 
 // read all items in the ./ dir
-$directory_list = [];
+$directoryList = [];
 if( $handle = opendir( './' ) ){
-	$item_list = [];
+	$itemList = [];
 	while( false !== ( $item = readdir( $handle ) ) ){
 		if( $item == '..' || $item == '.' || filenameMatch( $options['exclude'], $item ) ){
 			continue;
 		}
 
 		// Security: Validate path against traversal attacks
-		$strict_validation = $options['security']['strict_path_validation'] ?? true;
-		if( !validatePath( $item, $strict_validation ) ){
+		$strictValidation = $options['security']['strict_path_validation'] ?? true;
+		if( !validatePath( $item, $strictValidation ) ){
 			continue;
 		}
 
-		$item_type = is_dir( $item ) ? 'dir' : 'file';
-		$order = ( $item_type == 'dir' ) ? 1 : 0;
-		$item_list[] = [
+		$itemType = is_dir( $item ) ? 'dir' : 'file';
+		$order = ( $itemType == 'dir' ) ? 1 : 0;
+		$itemList[] = [
 			'name' => $item,
-			'type' => $item_type,
+			'type' => $itemType,
 			'order' => $order
 		];
 	}
 	usort(
-		$item_list,
+		$itemList,
 		static function ( $a, $b ) {
 			if( $a['order'] === $b['order'] ){
 				return strcasecmp( $a['name'], $b['name'] );
@@ -458,54 +472,54 @@ if( $handle = opendir( './' ) ){
 			return $b['order'] <=> $a['order'];
 		}
 	);
-	$directory_list = $item_list;
+	$directoryList = $itemList;
 	closedir( $handle );
 }
 
-$project_count = 0;
-$file_count = 0;
-$latest_item = null;
-$latest_mtime = 0;
-$recent_items = [];
+$projectCount = 0;
+$fileCount = 0;
+$latestItem = null;
+$latestMtime = 0;
+$recentItems = [];
 
-foreach( $directory_list as $item ){
-	$is_dir = ( $item['type'] === 'dir' );
-	$project_count += $is_dir ? 1 : 0;
-	$file_count += $is_dir ? 0 : 1;
+foreach( $directoryList as $item ){
+	$isDir = ( $item['type'] === 'dir' );
+	$projectCount += $isDir ? 1 : 0;
+	$fileCount += $isDir ? 0 : 1;
 
 	$path = __DIR__ . '/' . $item['name'];
 	$mtime = filemtime( $path );
 	if( $mtime !== false && $mtime > 0 ){
-		$recent_items[] = $item + [
+		$recentItems[] = $item + [
 			'mtime' => $mtime,
 		];
-		if( $mtime > $latest_mtime ){
-			$latest_mtime = $mtime;
-			$latest_item = $item;
+		if( $mtime > $latestMtime ){
+			$latestMtime = $mtime;
+			$latestItem = $item;
 		}
 	}
 }
 
 $stats = [];
-if( $project_count > 0 ){
-	$stats['Projects'] = number_format( $project_count );
+if( $projectCount > 0 ){
+	$stats['Projects'] = number_format( $projectCount );
 }
-if( $file_count > 0 ){
-	$stats['Files'] = number_format( $file_count );
+if( $fileCount > 0 ){
+	$stats['Files'] = number_format( $fileCount );
 }
-if( $latest_item ){
-	$stats['Last update'] = formatRelativeTime( $latest_mtime ) . ' · ' . $latest_item['name'];
+if( $latestItem ){
+	$stats['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
 }
-$disk_total = disk_total_space( __DIR__ );
-$disk_free = disk_free_space( __DIR__ );
-if( $disk_total !== false && $disk_total > 0 && $disk_free !== false ){
-	$free_percent = round( ( $disk_free / $disk_total ) * 100 );
-	$stats['Disk free'] = humanFileSize( $disk_free ) . ' (' . $free_percent . '%)';
+$diskTotal = disk_total_space( __DIR__ );
+$diskFree = disk_free_space( __DIR__ );
+if( $diskTotal !== false && $diskTotal > 0 && $diskFree !== false ){
+	$freePercent = round( ( $diskFree / $diskTotal ) * 100 );
+	$stats['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
 }
 
-usort( $recent_items, static fn( $a, $b ) => $b['mtime'] <=> $a['mtime'] );
-$recent_items = array_slice( $recent_items, 0, 5 );
-$recent_items = array_map(
+usort( $recentItems, static fn( $a, $b ) => $b['mtime'] <=> $a['mtime'] );
+$recentItems = array_slice( $recentItems, 0, RECENT_ITEMS_LIMIT );
+$recentItems = array_map(
 	static function( $item ) {
 		$mtime = $item['mtime'];
 		return [
@@ -516,7 +530,7 @@ $recent_items = array_map(
 			'absolute' => date( 'M j, Y H:i', $mtime ),
 		];
 	},
-	$recent_items
+	$recentItems
 );
 
 $themes = [
@@ -642,14 +656,14 @@ $themes = [
 	],
 ];
 
-$theme_order = array_keys( $themes );
-$default_theme_key = array_key_exists( $options['theme'], $themes ) ? $options['theme'] : $theme_order[0];
-$theme = $themes[ $default_theme_key ];
-$default_theme_index = array_search( $default_theme_key, $theme_order, true );
+$themeOrder = array_keys( $themes );
+$defaultThemeKey = array_key_exists( $options['theme'], $themes ) ? $options['theme'] : $themeOrder[0];
+$theme = $themes[ $defaultThemeKey ];
+$defaultThemeIndex = array_search( $defaultThemeKey, $themeOrder, true );
 
-$themes_for_client = [];
-foreach( $theme_order as $key ){
-	$themes_for_client[ $key ] = [
+$themesForClient = [];
+foreach( $themeOrder as $key ){
+	$themesForClient[ $key ] = [
 		'label' => $themes[ $key ]['label'],
 		'background' => $themes[ $key ]['background'],
 		'accent' => $themes[ $key ]['accent'],
@@ -663,19 +677,19 @@ foreach( $theme_order as $key ){
 	];
 }
 
-$favicon_candidates = $options['favicon'] ?? [];
-if( is_string( $favicon_candidates ) ){
-	$favicon_candidates = [ $favicon_candidates ];
+$faviconCandidates = $options['favicon'] ?? [];
+if( is_string( $faviconCandidates ) ){
+	$faviconCandidates = [ $faviconCandidates ];
 }
-$favicon_candidates = array_filter(
-	array_map( static fn( $candidate ) => ltrim( trim( (string) $candidate ), '/' ), $favicon_candidates )
+$faviconCandidates = array_filter(
+	array_map( static fn( $candidate ) => ltrim( trim( (string) $candidate ), '/' ), $faviconCandidates )
 );
 
-$favicon_href = '';
-foreach( $favicon_candidates as $candidate ){
-	$favicon_path = __DIR__ . '/' . $candidate;
-	if( file_exists( $favicon_path ) ){
-		$favicon_href = $candidate;
+$faviconHref = '';
+foreach( $faviconCandidates as $candidate ){
+	$faviconPath = __DIR__ . '/' . $candidate;
+	if( file_exists( $faviconPath ) ){
+		$faviconHref = $candidate;
 		break;
 	}
 }
@@ -685,8 +699,8 @@ foreach( $favicon_candidates as $candidate ){
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <?php if( !empty( $favicon_href ) ): ?>
-        <link rel="icon" href="<?= htmlspecialchars( $favicon_href, ENT_QUOTES, 'UTF-8' ); ?>">
+    <?php if( !empty( $faviconHref ) ): ?>
+        <link rel="icon" href="<?= htmlspecialchars( $faviconHref, ENT_QUOTES, 'UTF-8' ); ?>">
     <?php endif; ?>
     <style>
         :root {
@@ -1074,11 +1088,11 @@ foreach( $favicon_candidates as $candidate ){
 
 <body>
 <div class="theme-toggle" role="group" aria-label="Theme selector">
-	<?php foreach( $theme_order as $idx => $key ): ?>
+	<?php foreach( $themeOrder as $idx => $key ): ?>
         <button
             type="button"
             data-theme-key="<?= htmlspecialchars( $key, ENT_QUOTES, 'UTF-8' ); ?>"
-            aria-pressed="<?= $idx === $default_theme_index ? 'true' : 'false'; ?>"
+            aria-pressed="<?= $idx === $defaultThemeIndex ? 'true' : 'false'; ?>"
             aria-label="<?= htmlspecialchars( $themes[ $key ]['label'], ENT_QUOTES, 'UTF-8' ); ?>"
             style="--theme-accent: <?= htmlspecialchars( $themes[ $key ]['accent'], ENT_QUOTES, 'UTF-8' ); ?>;"
         ></button>
@@ -1090,7 +1104,7 @@ foreach( $favicon_candidates as $candidate ){
         <div class="content">
             <input type="text" placeholder="Search" class="search">
             <ul>
-				<?php foreach( $directory_list as $item ): ?>
+				<?php foreach( $directoryList as $item ): ?>
                     <li class="<?= $item['type'] ?>">
                         <a target="_blank" href="<?= $item['name'] ?>">
 							<?= $item['name']; ?>
@@ -1142,11 +1156,11 @@ foreach( $favicon_candidates as $candidate ){
                 </div>
             </div>
 		<?php endif; ?>
-		<?php if( !empty( $recent_items ) ): ?>
+		<?php if( !empty( $recentItems ) ): ?>
             <div class="recent">
                 <h2>recent</h2>
                 <ul>
-					<?php foreach( $recent_items as $item ): ?>
+					<?php foreach( $recentItems as $item ): ?>
                         <li class="<?= htmlspecialchars( $item['type'], ENT_QUOTES, 'UTF-8' ); ?>">
                             <span class="name"><?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?></span>
                             <small title="<?= htmlspecialchars( $item['absolute'], ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $item['relative'], ENT_QUOTES, 'UTF-8' ); ?></small>
@@ -1158,9 +1172,9 @@ foreach( $favicon_candidates as $candidate ){
     </aside>
 </main>
 <script>
-    const themeData = <?= json_encode( $themes_for_client, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
-    const themeOrder = <?= json_encode( array_values( $theme_order ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
-    const defaultThemeKey = <?= json_encode( $default_theme_key, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
+    const themeData = <?= json_encode( $themesForClient, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
+    const themeOrder = <?= json_encode( array_values( $themeOrder ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
+    const defaultThemeKey = <?= json_encode( $defaultThemeKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
     const themeButtons = Array.from(document.querySelectorAll('.theme-toggle button'));
     const rootStyle = document.documentElement.style;
     const THEME_STORAGE_KEY = 'directoryTheme';
