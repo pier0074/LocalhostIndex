@@ -572,31 +572,35 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 	$password = $password !== null ? (string) $password : '';
 
 	if( !empty( $user ) || $socket !== null ){
-		$mysqli = mysqli_init();
-		if( $mysqli ){
-			if( defined( 'MYSQLI_OPT_CONNECT_TIMEOUT' ) ){
-				mysqli_options( $mysqli, MYSQLI_OPT_CONNECT_TIMEOUT, $timeout );
-			}
-			// Suppress connection errors as this is detection, not critical functionality
-			$connected = @mysqli_real_connect(
-				$mysqli,
-				$host,
-				$user,
-				$password,
-				$database,
-				$port,
-				$socket
-			);
-			if( $connected ){
-				$server_info = mysqli_get_server_info( $mysqli );
-				mysqli_close( $mysqli );
-				if( !empty( $server_info ) ){
-					if( preg_match( '/([0-9]+\\.[0-9]+\\.[0-9]+)/', $server_info, $matches ) ){
-						return $matches[1];
+		try {
+			$mysqli = mysqli_init();
+			if( $mysqli ){
+				if( defined( 'MYSQLI_OPT_CONNECT_TIMEOUT' ) ){
+					mysqli_options( $mysqli, MYSQLI_OPT_CONNECT_TIMEOUT, $timeout );
+				}
+				// Suppress connection errors as this is detection, not critical functionality
+				$connected = @mysqli_real_connect(
+					$mysqli,
+					$host,
+					$user,
+					$password,
+					$database,
+					$port,
+					$socket
+				);
+				if( $connected ){
+					$server_info = mysqli_get_server_info( $mysqli );
+					mysqli_close( $mysqli );
+					if( !empty( $server_info ) ){
+						if( preg_match( '/([0-9]+\\.[0-9]+\\.[0-9]+)/', $server_info, $matches ) ){
+							return $matches[1];
+						}
+						return $server_info;
 					}
-					return $server_info;
 				}
 			}
+		} catch( mysqli_sql_exception $e ){
+			// Silently ignore MySQL connection failures - this is optional detection
 		}
 	}
 
