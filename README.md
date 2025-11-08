@@ -2,7 +2,7 @@
 
 A beautiful, self-contained localhost homepage for local development environments. Display all your projects, server info, and quick links in one elegant interface.
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -11,10 +11,11 @@ A beautiful, self-contained localhost homepage for local development environment
 - 📂 **Directory Browser** - Automatically scans and displays all projects/folders
 - 🎨 **10 Beautiful Themes** - Switch between bluey, sunny, forest, retro, matrix, nebula, sundown, mono, dark, and light
 - 🔍 **Instant Search** - Filter projects with live search and Enter-to-navigate
-- 🔀 **Sorting Options** - Sort by name, date modified, or file size ✨ NEW
-- 💾 **File Sizes** - Display file sizes in human-readable format ✨ NEW
-- ⚡ **Smart Caching** - 60-second cache for improved performance ✨ NEW
-- 📊 **Server Dashboard** - Shows Apache, PHP, and MySQL versions
+- 🔀 **Sorting Options** - Sort by name, date modified, or file size
+- 💾 **File Sizes** - Display file sizes in human-readable format
+- ⚡ **Smart Caching** - 60-second cache for improved performance
+- 🔧 **Multi-Runtime Detection** - Auto-detects Python, Node.js, Ruby, Go, Docker and more ✨ NEW
+- 📊 **Server Dashboard** - Shows Apache, PHP, MySQL, and all detected development tools
 - 📈 **Statistics** - Project count, file count, disk usage, and last update info
 - ⏱️ **Recent Activity** - Displays 5 most recently modified files/folders
 - 🔗 **Quick Links** - Configurable shortcuts to phpMyAdmin, phpinfo, or custom tools
@@ -282,6 +283,39 @@ The entire application is intentionally in one `index.php` file for:
 - **Easy Updates** - Replace one file to upgrade
 
 ## Version History
+
+### v1.3.0 (2025-01-08) - Multi-Runtime Detection Release
+
+**New Features**:
+- 🔧 **Universal Runtime Detection** - Auto-detects development tools by sourcing user's shell profile
+- 🐍 **Python & pip** - Detects correct Python/pip versions (including pyenv, conda, virtualenv)
+- 📦 **Node.js & npm** - Detects Node.js and npm (including nvm installations)
+- 💎 **Ruby** - Auto-detects Ruby version (including rbenv, rvm)
+- 🐹 **Go** - Detects Go programming language
+- 🎼 **Composer** - Detects PHP Composer version
+- 🔀 **Git** - Shows installed Git version
+- 🐳 **Docker** - Detects Docker installation
+- 🎯 **Version Manager Support** - Works with pyenv, nvm, rbenv, rvm, asdf, conda, and more
+
+**Technical Implementation**:
+- Sources user's shell profile (`.zshrc`, `.bashrc`, `.bash_profile`, `.profile`)
+- Loads version managers automatically from user environment
+- Universal solution - works on any computer without hardcoded paths
+- Graceful fallback when tools aren't installed
+- Secure shell execution with disabled function checks
+
+**Compatibility**:
+- ✅ Works with Apache (limited PATH environment)
+- ✅ Works with CLI PHP
+- ✅ macOS, Linux, Windows WSL
+- ✅ All major version managers supported
+
+**Performance**:
+- ⚡ Minimal overhead - detection runs once per page load
+- 🔒 Safe execution - checks for disabled functions
+- 📊 Dynamic display - UI adapts to detected runtimes
+
+**Breaking Changes**: None (fully backward compatible)
 
 ### v1.2.0 (2025-01-08) - User Experience & Performance Release
 
