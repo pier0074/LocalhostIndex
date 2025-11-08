@@ -746,6 +746,67 @@ if( $diskTotal !== false && $diskTotal > 0 && $diskFree !== false ){
 	$stats['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
 }
 
+// System Stats
+$systemStats = [];
+
+// Total Disk
+if( $diskTotal !== false && $diskTotal > 0 ){
+	$systemStats['Total disk'] = humanFileSize( $diskTotal );
+}
+
+// Memory
+if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
+	$memInfo = @shell_exec( PHP_OS_FAMILY === 'Darwin' ? 'sysctl hw.memsize' : 'free -b | grep Mem' );
+	if( $memInfo ){
+		if( PHP_OS_FAMILY === 'Darwin' ){
+			if( preg_match( '/hw\.memsize:\s+(\d+)/', $memInfo, $matches ) ){
+				$systemStats['Memory'] = humanFileSize( (int)$matches[1] );
+			}
+		} else {
+			if( preg_match( '/Mem:\s+(\d+)/', $memInfo, $matches ) ){
+				$systemStats['Memory'] = humanFileSize( (int)$matches[1] );
+			}
+		}
+	}
+}
+
+// CPU Info
+if( PHP_OS_FAMILY === 'Darwin' ){
+	$cpuModel = @shell_exec( 'sysctl -n machdep.cpu.brand_string' );
+	$cpuCores = @shell_exec( 'sysctl -n hw.ncpu' );
+	if( $cpuModel && $cpuCores ){
+		$cpuModel = trim( $cpuModel );
+		$cpuCores = trim( $cpuCores );
+		$systemStats['CPU'] = $cpuCores . ' cores';
+	}
+} elseif( PHP_OS_FAMILY === 'Linux' ){
+	$cpuInfo = @shell_exec( 'nproc' );
+	if( $cpuInfo ){
+		$systemStats['CPU'] = trim( $cpuInfo ) . ' cores';
+	}
+}
+
+// Uptime
+if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
+	$uptime = @shell_exec( 'uptime' );
+	if( $uptime && preg_match( '/up\s+(.+?),\s+\d+\s+user/', $uptime, $matches ) ){
+		$systemStats['Uptime'] = trim( $matches[1] );
+	}
+}
+
+// OS Version
+if( PHP_OS_FAMILY === 'Darwin' ){
+	$osVersion = @shell_exec( 'sw_vers -productVersion' );
+	if( $osVersion ){
+		$systemStats['OS'] = 'macOS ' . trim( $osVersion );
+	}
+} elseif( PHP_OS_FAMILY === 'Linux' ){
+	$osVersion = @shell_exec( "lsb_release -ds 2>/dev/null || cat /etc/*release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'" );
+	if( $osVersion ){
+		$systemStats['OS'] = trim( explode( "\n", $osVersion )[0] );
+	}
+}
+
 usort( $recentItems, static fn( $a, $b ) => $b['mtime'] <=> $a['mtime'] );
 $recentItems = array_slice( $recentItems, 0, RECENT_ITEMS_LIMIT );
 $recentItems = array_map(
@@ -1131,7 +1192,9 @@ foreach( $faviconCandidates as $candidate ){
 
 
         .info,
-        .stats {
+        .stats,
+        .system-stats,
+        .actions {
             margin-bottom: calc(var(--spacing-unit) * 3);
             padding: var(--card-padding);
             background: var(--card-bg);
@@ -1140,7 +1203,8 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .info .table > div,
-        .stats .table > div {
+        .stats .table > div,
+        .system-stats .table > div {
             margin: 7px 0;
             color: var(--color-muted);
             display: flex;
@@ -1154,7 +1218,8 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .info .table > div > span:first-child,
-        .stats .table > div > span:first-child {
+        .stats .table > div > span:first-child,
+        .system-stats .table > div > span:first-child {
             flex: 1;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -1163,7 +1228,8 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .info .table > div > span:last-child,
-        .stats .table > div > span:last-child {
+        .stats .table > div > span:last-child,
+        .system-stats .table > div > span:last-child {
             flex-shrink: 0;
             font-weight: bold;
             padding: 0 3px;
@@ -1174,6 +1240,52 @@ foreach( $faviconCandidates as $candidate ){
         .stats .table > div > span:last-child {
             color: var(--color-secondary);
             font-weight: 600;
+        }
+
+        .system-stats .table > div > span:last-child {
+            color: var(--color-accent);
+            font-weight: 600;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: var(--input-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: var(--color-text);
+            padding: 10px 12px;
+            font-family: monospace;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .action-btn span {
+            font-size: 14px;
+        }
+
+        .action-btn:hover {
+            background: var(--input-focus-bg);
+            border-color: var(--color-accent);
+            transform: translateY(-1px);
+        }
+
+        .action-btn:active {
+            transform: translateY(0);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .expand-btn {
@@ -1611,6 +1723,36 @@ foreach( $faviconCandidates as $candidate ){
                 </div>
             </div>
 		<?php endif; ?>
+		<?php if( !empty( $systemStats ) ): ?>
+            <div class="system-stats">
+                <h2>system</h2>
+                <div class="table">
+					<?php foreach( $systemStats as $label => $value ): ?>
+                        <div>
+                            <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
+                            <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
+                        </div>
+					<?php endforeach; ?>
+                </div>
+            </div>
+		<?php endif; ?>
+            <div class="actions">
+                <h2>actions</h2>
+                <div class="action-buttons">
+                    <button class="action-btn" data-action="restart-apache" title="Restart Apache">
+                        <span>🔄</span> Apache
+                    </button>
+                    <button class="action-btn" data-action="restart-mysql" title="Restart MySQL">
+                        <span>🔄</span> MySQL
+                    </button>
+                    <button class="action-btn" data-action="clear-cache" title="Clear PHP Cache">
+                        <span>🗑️</span> Cache
+                    </button>
+                    <button class="action-btn" data-action="view-logs" title="View Error Log">
+                        <span>📋</span> Logs
+                    </button>
+                </div>
+            </div>
 		<?php if( !empty( $recentItems ) ): ?>
             <div class="recent">
                 <h2>recent</h2>
