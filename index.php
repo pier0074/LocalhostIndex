@@ -190,27 +190,145 @@ if( isset( $_GET['phpinfo'] ) && $_GET['phpinfo'] === '1' ){
 	exit;
 }
 
-// server info
-$apacheVersion = 'Unknown';
-if( function_exists( 'apache_get_version' ) ){
-	$versionString = apache_get_version();
-	if( $versionString !== false ){
-		$parts = explode( '/', $versionString );
-		if( isset( $parts[1] ) ){
-			$apacheVersion = explode( ' ', $parts[1] )[0];
+/**
+ * Detect runtime version by sourcing user's shell profile
+ * This ensures version managers (pyenv, nvm, rbenv, etc.) are loaded
+ */
+function detectRuntimeVersion( $command, $versionFlag = '--version', $pattern = '/(\d+\.\d+[\.\d]*)/' ) {
+	$disableFunctions = array_map(
+		'trim',
+		explode( ',', strtolower( (string) ini_get( 'disable_functions' ) ) )
+	);
+	$shellAvailable = function_exists( 'shell_exec' ) && !in_array( 'shell_exec', $disableFunctions, true );
+
+	if( !$shellAvailable ){
+		return null;
+	}
+
+	// Find user's shell profile to source version managers
+	$homeDir = getenv( 'HOME' );
+	$profiles = [ '.zshrc', '.bashrc', '.bash_profile', '.profile' ];
+	$sourceCmd = '';
+
+	if( $homeDir ){
+		foreach( $profiles as $profile ){
+			$profilePath = $homeDir . '/' . $profile;
+			if( file_exists( $profilePath ) ){
+				$sourceCmd = "source $profilePath 2>/dev/null && ";
+				break;
+			}
 		}
 	}
+
+	// Execute command with sourced environment
+	$cmd = "bash -c '" . $sourceCmd . escapeshellarg( $command ) . " " . $versionFlag . "' 2>/dev/null";
+	$output = trim( (string) shell_exec( $cmd ) );
+
+	if( $output === '' ){
+		return null;
+	}
+
+	if( preg_match( $pattern, $output, $matches ) ){
+		return $matches[1];
+	}
+
+	return null;
 }
-$phpVersion = explode( '-', phpversion() )[0];
 
+/**
+ * Auto-detect installed runtimes and their versions
+ */
+function detectRuntimes() {
+	$runtimes = [];
 
-$mysqlVersion = detectMysqlVersion( $options['mysql'] ?? [] );
+	// Web Server
+	if( function_exists( 'apache_get_version' ) ){
+		$versionString = apache_get_version();
+		if( $versionString !== false ){
+			$parts = explode( '/', $versionString );
+			if( isset( $parts[1] ) ){
+				$runtimes['Apache'] = explode( ' ', $parts[1] )[0];
+			}
+		}
+	}
 
-$info = [
-	'Apache' => $apacheVersion,
-	'PHP' => $phpVersion,
-	'MySQL' => $mysqlVersion
-];
+	// PHP (always available)
+	$runtimes['PHP'] = explode( '-', phpversion() )[0];
+
+	// MySQL/MariaDB
+	$mysqlVersion = detectMysqlVersion( [] );
+	if( $mysqlVersion && $mysqlVersion !== 'Unknown' ){
+		$runtimes['MySQL'] = $mysqlVersion;
+	}
+
+	// Python
+	$pythonVersion = detectRuntimeVersion( 'python3', '--version', '/Python (\d+\.\d+\.\d+)/' );
+	if( !$pythonVersion ){
+		$pythonVersion = detectRuntimeVersion( 'python', '--version', '/Python (\d+\.\d+\.\d+)/' );
+	}
+	if( $pythonVersion ){
+		$runtimes['Python'] = $pythonVersion;
+	}
+
+	// pip
+	$pipVersion = detectRuntimeVersion( 'pip3', '--version', '/pip (\d+\.\d+[\.\d]*)/' );
+	if( !$pipVersion ){
+		$pipVersion = detectRuntimeVersion( 'pip', '--version', '/pip (\d+\.\d+[\.\d]*)/' );
+	}
+	if( $pipVersion ){
+		$runtimes['pip'] = $pipVersion;
+	}
+
+	// Node.js
+	$nodeVersion = detectRuntimeVersion( 'node', '--version', '/v?(\d+\.\d+\.\d+)/' );
+	if( $nodeVersion ){
+		$runtimes['Node.js'] = $nodeVersion;
+	}
+
+	// npm
+	$npmVersion = detectRuntimeVersion( 'npm', '--version' );
+	if( $npmVersion ){
+		$runtimes['npm'] = $npmVersion;
+	}
+
+	// Ruby
+	$rubyVersion = detectRuntimeVersion( 'ruby', '--version', '/ruby (\d+\.\d+\.\d+)/' );
+	if( $rubyVersion ){
+		$runtimes['Ruby'] = $rubyVersion;
+	}
+
+	// Go
+	$goVersion = detectRuntimeVersion( 'go', 'version', '/go(\d+\.\d+[\.\d]*)/' );
+	if( $goVersion ){
+		$runtimes['Go'] = $goVersion;
+	}
+
+	// Composer
+	$composerVersion = detectRuntimeVersion( 'composer', '--version', '/Composer version (\d+\.\d+\.\d+)/' );
+	if( !$composerVersion ){
+		$composerVersion = detectRuntimeVersion( 'composer', '--version', '/(\d+\.\d+\.\d+)/' );
+	}
+	if( $composerVersion ){
+		$runtimes['Composer'] = $composerVersion;
+	}
+
+	// Git
+	$gitVersion = detectRuntimeVersion( 'git', '--version', '/git version (\d+\.\d+[\.\d]*)/' );
+	if( $gitVersion ){
+		$runtimes['Git'] = $gitVersion;
+	}
+
+	// Docker
+	$dockerVersion = detectRuntimeVersion( 'docker', '--version', '/Docker version (\d+\.\d+\.\d+)/' );
+	if( $dockerVersion ){
+		$runtimes['Docker'] = $dockerVersion;
+	}
+
+	return $runtimes;
+}
+
+// Detect all installed runtimes
+$info = detectRuntimes();
 
 // match a given filename against an array of patterns
 function filenameMatch( $patternArray, $filename ) {
