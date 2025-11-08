@@ -1034,16 +1034,17 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         main {
-            width: min(1100px, 95vw);
-            margin: 8px auto 45px;
-            display: flex;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: 1fr minmax(280px, 400px);
             gap: 36px;
+            width: 100%;
+            max-width: 1600px;
+            margin: 8px auto 45px;
+            padding: 0 clamp(20px, 5vw, 80px);
             color: var(--color-text);
         }
 
         main > .projects {
-            flex: 2.4;
             min-width: 0;
             display: flex;
             flex-direction: column;
@@ -1104,7 +1105,6 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         main > aside {
-            flex: 1.2;
             min-width: 280px;
         }
 
@@ -1406,6 +1406,13 @@ foreach( $faviconCandidates as $candidate ){
             color: var(--color-bkg);
         }
 
+        @media screen and (max-width: 900px) {
+            main {
+                grid-template-columns: 1fr;
+                padding: 0 clamp(16px, 3vw, 40px);
+            }
+        }
+
         @media screen and (max-width: 500px) {
             body {
                 padding: 80px 12px 45px;
@@ -1426,8 +1433,9 @@ foreach( $faviconCandidates as $candidate ){
             main {
                 margin: 16px 0 45px;
                 max-height: none;
-                flex-direction: column;
+                grid-template-columns: 1fr;
                 gap: 28px;
+                padding: 0 12px;
             }
 
             main > aside {
