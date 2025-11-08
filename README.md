@@ -2,7 +2,7 @@
 
 A beautiful, self-contained localhost homepage for local development environments. Display all your projects, server info, and quick links in one elegant interface.
 
-![Version](https://img.shields.io/badge/version-1.4.0-blue)
+![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![GitHub stars](https://img.shields.io/github/stars/pier0074/LocalhostIndex?style=social)
@@ -18,10 +18,13 @@ A beautiful, self-contained localhost homepage for local development environment
 - 🔀 **Sorting Options** - Sort by name, date modified, or file size
 - 💾 **File Sizes** - Display file sizes in human-readable format
 - ⚡ **Smart Caching** - 60-second cache for improved performance
-- 🔧 **Multi-Runtime Detection** - Auto-detects Python, Node.js, Ruby, Go, Docker and more ✨ NEW
+- 🔧 **Multi-Runtime Detection** - Auto-detects Python, Node.js, Ruby, Go, Docker and more
 - 📊 **Server Dashboard** - Shows Apache, PHP, MySQL, and all detected development tools
-- 📈 **Statistics** - Project count, file count, disk usage, and last update info
-- ⏱️ **Recent Activity** - Displays 5 most recently modified files/folders
+- 📈 **System Statistics** - Total disk, Memory, CPU cores, Uptime, OS version with names (macOS Sonoma, etc.) ✨ NEW
+- 🎛️ **Quick Actions** - Restart Apache/MySQL, Clear Cache, View Logs with one click ✨ NEW
+- 📁 **Collapsible Sections** - All sections expand/collapse with +/- toggle buttons ✨ NEW
+- 🔎 **Preview Mode** - See key info at a glance, expand for full details ✨ NEW
+- ⏱️ **Recent Activity** - Displays 2 recent items (folded) or 10 items (expanded)
 - 🔗 **Quick Links** - Configurable shortcuts to phpMyAdmin, phpinfo, or custom tools
 - 📱 **Responsive Design** - Works beautifully on desktop and mobile
 - ♿ **Accessible** - Keyboard navigation and ARIA labels
