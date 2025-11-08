@@ -2,7 +2,7 @@
 
 A beautiful, self-contained localhost homepage for local development environments. Display all your projects, server info, and quick links in one elegant interface.
 
-![Version](https://img.shields.io/badge/version-1.5.3-blue)
+![Version](https://img.shields.io/badge/version-1.6.0-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![GitHub stars](https://img.shields.io/github/stars/pier0074/LocalhostIndex?style=social)
@@ -15,7 +15,9 @@ A beautiful, self-contained localhost homepage for local development environment
 - 📂 **Directory Browser** - Automatically scans and displays all projects/folders
 - 🎨 **10 Beautiful Themes** - Switch between bluey, sunny, forest, retro, matrix, nebula, sundown, mono, dark, and light
 - 🔍 **Instant Search** - Filter projects with live search and Enter-to-navigate
-- 🔀 **Sorting Options** - Sort by name, date modified, or file size
+- 🔀 **Instant Sorting** - Client-side sort by name, date, or size with no page reload ✨ NEW
+- 🔄 **Reverse Sort** - Click any sort button twice to reverse order (A-Z ↔ Z-A) ✨ NEW
+- 📁 **Folder Sizes** - Actual folder sizes calculated recursively ✨ NEW
 - 💾 **File Sizes** - Display file sizes in human-readable format
 - ⚡ **Smart Caching** - 60-second cache for improved performance
 - 🔧 **Multi-Runtime Detection** - Auto-detects Python, Node.js, Ruby, Go, Docker and more
