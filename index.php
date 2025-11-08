@@ -932,6 +932,10 @@ foreach( $faviconCandidates as $candidate ){
         <link rel="icon" href="<?= htmlspecialchars( $faviconHref, ENT_QUOTES, 'UTF-8' ); ?>">
     <?php endif; ?>
     <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         :root {
             --color-bkg: <?=$theme['background']?>;
             --color-accent: <?=$theme['accent']?>;
@@ -954,6 +958,10 @@ foreach( $faviconCandidates as $candidate ){
             --body-padding-top: 24px;
             --body-padding-bottom: 24px;
             --body-padding-x: clamp(16px, 3vw, 32px);
+        }
+
+        html {
+            height: 100%;
         }
 
         body {
@@ -982,7 +990,7 @@ foreach( $faviconCandidates as $candidate ){
         .theme-toggle {
             position: fixed;
             top: 16px;
-            right: var(--body-padding-x);
+            left: var(--body-padding-x);
             display: flex;
             gap: 10px;
             padding: 10px 14px;
@@ -1451,8 +1459,6 @@ foreach( $faviconCandidates as $candidate ){
             }
 
             .theme-toggle {
-                top: 16px;
-                right: 16px;
                 padding: 8px 12px;
                 gap: 8px;
             }
