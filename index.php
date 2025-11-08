@@ -343,6 +343,43 @@ if( isset( $_GET['action'] ) && $_GET['action'] === 'detect_runtimes' ){
 	exit;
 }
 
+// AJAX endpoint for quick actions
+if( isset( $_POST['action'] ) ){
+	// IMPORTANT: Set content type first, before any output
+	header( 'Content-Type: application/json' );
+
+	// Verify CSRF token if enabled
+	if( !empty( $options['security']['enable_csrf'] ) ){
+		if( !isset( $_POST['token'] ) || !hash_equals( $_SESSION['csrf_token'], $_POST['token'] ) ){
+			http_response_code( 403 );
+			die( json_encode( [ 'success' => false, 'message' => 'Invalid token' ] ) );
+		}
+	}
+
+	$action = $_POST['action'];
+	$result = [ 'success' => false, 'message' => 'Unknown action' ];
+
+	switch( $action ){
+		case 'clear-opcache':
+			if( function_exists( 'opcache_reset' ) ){
+				opcache_reset();
+				$result = [ 'success' => true, 'message' => 'OPcache cleared successfully' ];
+			} else {
+				$result = [ 'success' => false, 'message' => 'OPcache not available' ];
+			}
+			break;
+
+		case 'clear-sessions':
+			$sessionPath = session_save_path() ?: '/tmp';
+			$output = @shell_exec( "find {$sessionPath} -name 'sess_*' -type f -delete 2>&1" );
+			$result = [ 'success' => true, 'message' => 'Session files cleared', 'output' => $output ];
+			break;
+	}
+
+	echo json_encode( $result );
+	exit;
+}
+
 // Detect basic info only (fast - no shell sourcing)
 function detectBasicInfo() {
 	$info = [];
@@ -1398,6 +1435,14 @@ foreach( $faviconCandidates as $candidate ){
             gap: 8px;
         }
 
+        #actions-preview {
+            display: grid;
+        }
+
+        #actions-extended {
+            display: none;
+        }
+
         .action-btn {
             background: var(--input-bg);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1431,6 +1476,15 @@ foreach( $faviconCandidates as $candidate ){
         .action-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        .action-section h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--color-muted);
+            margin-bottom: calc(var(--spacing-unit) * 2);
+            font-weight: 600;
         }
 
         .expand-btn {
@@ -1900,25 +1954,23 @@ foreach( $faviconCandidates as $candidate ){
             <div class="actions">
                 <div class="section-header">
                     <h2>actions</h2>
-                    <button class="toggle-btn" data-target="actions-extended" aria-label="Expand actions">+</button>
                 </div>
                 <div class="action-buttons">
-                    <button class="action-btn" data-action="clear-cache" title="Clear PHP opcache">
-                        <span>🗑️</span> Clear Cache
+                    <button class="action-btn" data-action="clear-opcache" title="Clear OPcache">
+                        <span>🗑️</span> Clear OPcache
                     </button>
-                    <button class="action-btn" data-action="restart-apache" title="Restart Apache web server">
-                        <span>🔄</span> Restart Apache
+                    <button class="action-btn" data-action="clear-sessions" title="Clear session files">
+                        <span>🗑️</span> Clear Sessions
                     </button>
                 </div>
-                <div id="actions-extended" style="display: none; margin-top: calc(var(--spacing-unit) * 2);">
-                    <div class="action-buttons">
-                        <button class="action-btn" data-action="restart-mysql" title="Restart MySQL database">
-                            <span>🔄</span> Restart MySQL
-                        </button>
-                        <button class="action-btn" data-action="view-logs" title="View Apache error log">
-                            <span>📋</span> View Logs
-                        </button>
+
+                <!-- Action Output -->
+                <div id="action-output" style="display: none; margin-top: calc(var(--spacing-unit) * 2); padding: var(--card-padding); background: var(--input-bg); border-radius: var(--card-radius); border: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: calc(var(--spacing-unit) * 2);">
+                        <strong id="action-output-title">Output</strong>
+                        <button id="action-output-close" style="background: none; border: none; color: var(--color-accent); cursor: pointer; font-size: 20px;">×</button>
                     </div>
+                    <pre id="action-output-content" style="white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; font-size: 12px; line-height: 1.4;"></pre>
                 </div>
             </div>
 		<?php if( !empty( $recentPreview ) ): ?>
@@ -2054,7 +2106,7 @@ foreach( $faviconCandidates as $candidate ){
 
     searchInput.focus();
     searchInput.addEventListener('keyup', (e) => {
-        let val = searchInput.value.trim();
+        let val = searchInput.value.trim().toLowerCase();
 
         projectContent.querySelectorAll('li').forEach((el) => {
             // jump to the first displayed dir/file on enter
@@ -2067,7 +2119,7 @@ foreach( $faviconCandidates as $candidate ){
 
             if (val == '') {
                 el.classList.remove('hidden');
-            } else if (el.innerText.indexOf(val) <= -1) {
+            } else if (el.innerText.toLowerCase().indexOf(val) <= -1) {
                 el.classList.add('hidden');
             }
         });
@@ -2152,13 +2204,113 @@ foreach( $faviconCandidates as $candidate ){
                     if (previewId) {
                         const preview = document.getElementById(previewId);
                         if (preview) {
-                            preview.style.display = 'block';
+                            // Use grid for action-buttons, block for others
+                            preview.style.display = preview.classList.contains('action-buttons') ? 'grid' : 'block';
+                        }
+                    }
+
+                    // Hide action output when collapsing actions section
+                    if (targetId === 'actions-extended') {
+                        const actionOutput = document.getElementById('action-output');
+                        if (actionOutput) {
+                            actionOutput.style.display = 'none';
                         }
                     }
                 }
             }
         });
     });
+
+    // Action button handlers
+    const actionButtons = document.querySelectorAll('.action-btn');
+    const actionModal = document.getElementById('action-output');
+    const actionOutput = document.getElementById('action-output-content');
+    const closeModalBtn = document.getElementById('action-output-close');
+
+    actionButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const action = this.getAttribute('data-action');
+            if (!action) return;
+
+            // Disable button and show loading state
+            this.disabled = true;
+            const originalText = this.innerHTML;
+            this.innerHTML = '<span>⏳</span> Processing...';
+
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('action', action);
+<?php if( !empty( $options['security']['enable_csrf'] ) ): ?>
+            formData.append('token', '<?= $_SESSION['csrf_token'] ?>');
+<?php endif; ?>
+
+            // Send AJAX request
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(text => {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Failed to parse JSON. Error:', e);
+                    console.error('Server response (first 500 chars):', text.substring(0, 500));
+                    console.error('Response length:', text.length);
+                    throw new Error('Server returned invalid JSON. Check console for details.');
+                }
+            })
+            .then(data => {
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = originalText;
+
+                // Show modal with result
+                if (actionModal && actionOutput) {
+                    let output = `<strong>${data.success ? '✅' : '❌'} ${escapeHtml(data.message)}</strong>`;
+
+                    if (data.output) {
+                        output += `\n\n${escapeHtml(data.output)}`;
+                    }
+
+                    actionOutput.innerHTML = output;
+                    actionModal.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = originalText;
+
+                // Show error in modal
+                if (actionModal && actionOutput) {
+                    actionOutput.innerHTML = `<strong>❌ Error: ${escapeHtml(error.message)}</strong>`;
+                    actionModal.style.display = 'block';
+                }
+            });
+        });
+    });
+
+    // Close modal handler
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', function() {
+            if (actionModal) {
+                actionModal.style.display = 'none';
+            }
+        });
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 </script>
 </body>
 </html>
