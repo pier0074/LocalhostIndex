@@ -1448,14 +1448,48 @@ foreach( $faviconCandidates as $candidate ){
                 padding-right: 0;
             }
 
+            .projects ul li {
+                margin: 12px 0;
+            }
+
+            .projects ul li a {
+                padding: 12px 8px;
+                font-size: 14px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+            }
+
             .recent ul li {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 4px;
+                padding: 8px 0;
+            }
+
+            .recent ul li .name {
+                padding: 8px 12px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
             }
 
             .recent ul li small {
                 margin-left: 0;
+            }
+
+            .tools ul li a {
+                padding: 12px 8px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                font-size: 15px;
+            }
+
+            .sort-btn {
+                padding: 12px 16px;
+                font-size: 14px;
+                min-height: 44px;
             }
         }
     </style>
