@@ -10,7 +10,8 @@
 // Configuration constants
 define( 'CSRF_TOKEN_LENGTH', 32 );        // Length of CSRF token in bytes
 define( 'MYSQL_TIMEOUT', 2 );             // MySQL connection timeout in seconds
-define( 'RECENT_ITEMS_LIMIT', 5 );        // Number of recent items to display
+define( 'RECENT_ITEMS_LIMIT', 10 );       // Number of recent items to display (extended)
+define( 'RECENT_ITEMS_PREVIEW', 2 );      // Number of recent items in preview (folded)
 define( 'CACHE_TTL', 60 );                // Cache time-to-live in seconds
 
 $options = [
@@ -842,6 +843,10 @@ $recentItems = array_map(
 	$recentItems
 );
 
+// Split recent items into preview and extended
+$recentPreview = array_slice( $recentItems, 0, RECENT_ITEMS_PREVIEW );
+$recentExtended = array_slice( $recentItems, RECENT_ITEMS_PREVIEW );
+
 $themes = [
 	'light' => [
 		'label' => 'Light',
@@ -1385,9 +1390,8 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         #extended-info .table {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 0;
+            padding-top: 0;
         }
 
         #extended-info .table > div {
@@ -1806,11 +1810,14 @@ foreach( $faviconCandidates as $candidate ){
                     </div>
                 </div>
             </div>
-		<?php if( !empty( $recentItems ) ): ?>
+		<?php if( !empty( $recentPreview ) ): ?>
             <div class="recent">
-                <h2>recent</h2>
+                <div class="section-header">
+                    <h2>recent</h2>
+                    <button class="toggle-btn" data-target="recent-extended" aria-label="Expand recent">+</button>
+                </div>
                 <ul>
-					<?php foreach( $recentItems as $item ): ?>
+					<?php foreach( $recentPreview as $item ): ?>
                         <li class="<?= htmlspecialchars( $item['type'], ENT_QUOTES, 'UTF-8' ); ?>">
                             <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>" class="name">
 								<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
@@ -1819,6 +1826,20 @@ foreach( $faviconCandidates as $candidate ){
                         </li>
 					<?php endforeach; ?>
                 </ul>
+				<?php if( !empty( $recentExtended ) ): ?>
+                <div id="recent-extended" class="extended-section" style="display: none;">
+                    <ul>
+						<?php foreach( $recentExtended as $item ): ?>
+                            <li class="<?= htmlspecialchars( $item['type'], ENT_QUOTES, 'UTF-8' ); ?>">
+                                <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>" class="name">
+									<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
+                                </a>
+                                <small title="<?= htmlspecialchars( $item['absolute'], ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $item['relative'], ENT_QUOTES, 'UTF-8' ); ?></small>
+                            </li>
+						<?php endforeach; ?>
+                    </ul>
+                </div>
+				<?php endif; ?>
             </div>
 		<?php endif; ?>
     </aside>
