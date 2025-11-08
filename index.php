@@ -734,9 +734,13 @@ foreach( $directoryList as $item ){
 // Preview: Projects, Disk free, OS
 // Expanded Section 1 (Project Stats): Projects, Files, Last update
 // Expanded Section 2 (System Stats): Disk free, Total disk, Memory, CPU, Uptime, OS
+// Expanded Section 3 (PHP Stats): PHP memory limit, PHP max upload, OPcache status
+// Expanded Section 4 (Server Stats): Apache connections, Active ports, Running processes
 $statsPreview = [];
 $statsProjectExpanded = [];
 $statsSystemExpanded = [];
+$statsPHPExpanded = [];
+$statsServerExpanded = [];
 
 // Get disk info first (used in both preview and system expanded)
 $diskTotal = disk_total_space( __DIR__ );
@@ -840,6 +844,65 @@ if( PHP_OS_FAMILY === 'Darwin' ){
 		$osValue = trim( explode( "\n", $osVersion )[0] );
 		$statsPreview['OS'] = $osValue;
 		$statsSystemExpanded['OS'] = $osValue;
+	}
+}
+
+// PHP Stats
+$statsPHPExpanded['PHP memory limit'] = ini_get( 'memory_limit' );
+$statsPHPExpanded['PHP max upload'] = ini_get( 'upload_max_filesize' );
+
+// OPcache status
+if( function_exists( 'opcache_get_status' ) ){
+	$opcache = @opcache_get_status( false );
+	if( $opcache && isset( $opcache['opcache_enabled'] ) ){
+		if( $opcache['opcache_enabled'] ){
+			$hits = $opcache['opcache_statistics']['hits'] ?? 0;
+			$misses = $opcache['opcache_statistics']['misses'] ?? 0;
+			$total = $hits + $misses;
+			$hitRate = $total > 0 ? round( ( $hits / $total ) * 100, 1 ) : 0;
+			$statsPHPExpanded['OPcache'] = "Enabled ({$hitRate}% hit rate)";
+		} else {
+			$statsPHPExpanded['OPcache'] = 'Disabled';
+		}
+	}
+} else {
+	$statsPHPExpanded['OPcache'] = 'Not available';
+}
+
+// Server Stats
+// Apache connections
+if( function_exists( 'apache_get_modules' ) ){
+	$apacheStatus = @shell_exec( "netstat -an | grep -E ':(80|443)' | grep ESTABLISHED | wc -l" );
+	if( $apacheStatus !== null ){
+		$statsServerExpanded['Apache connections'] = trim( $apacheStatus );
+	}
+}
+
+// Active ports
+$activePorts = @shell_exec( "netstat -an | grep LISTEN | awk '{print \$4}' | grep -oE '[0-9]+\$' | sort -u | wc -l" );
+if( $activePorts !== null ){
+	$statsServerExpanded['Active ports'] = trim( $activePorts );
+}
+
+// Running processes
+if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
+	$apacheProc = @shell_exec( "ps aux | grep -E 'httpd|apache2' | grep -v grep | wc -l" );
+	$mysqlProc = @shell_exec( "ps aux | grep -E 'mysqld' | grep -v grep | wc -l" );
+	$nodeProc = @shell_exec( "ps aux | grep -E 'node' | grep -v grep | wc -l" );
+
+	$procCounts = [];
+	if( $apacheProc !== null && (int)trim( $apacheProc ) > 0 ){
+		$procCounts[] = 'Apache: ' . trim( $apacheProc );
+	}
+	if( $mysqlProc !== null && (int)trim( $mysqlProc ) > 0 ){
+		$procCounts[] = 'MySQL: ' . trim( $mysqlProc );
+	}
+	if( $nodeProc !== null && (int)trim( $nodeProc ) > 0 ){
+		$procCounts[] = 'Node: ' . trim( $nodeProc );
+	}
+
+	if( !empty( $procCounts ) ){
+		$statsServerExpanded['Running processes'] = implode( ', ', $procCounts );
 	}
 }
 
@@ -1788,7 +1851,7 @@ foreach( $faviconCandidates as $candidate ){
                         </div>
 					<?php endforeach; ?>
                 </div>
-				<?php if( !empty( $statsProjectExpanded ) || !empty( $statsSystemExpanded ) ): ?>
+				<?php if( !empty( $statsProjectExpanded ) || !empty( $statsSystemExpanded ) || !empty( $statsPHPExpanded ) || !empty( $statsServerExpanded ) ): ?>
                 <div id="stats-extended" style="display: none;">
 					<?php if( !empty( $statsProjectExpanded ) ): ?>
                         <div class="table">
@@ -1803,6 +1866,26 @@ foreach( $faviconCandidates as $candidate ){
 					<?php if( !empty( $statsSystemExpanded ) ): ?>
                         <div class="table" style="margin-top: calc(var(--spacing-unit) * 2); padding-top: calc(var(--spacing-unit) * 2); border-top: 1px solid rgba(255, 255, 255, 0.1);">
 							<?php foreach( $statsSystemExpanded as $label => $value ): ?>
+                                <div>
+                                    <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                    <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                </div>
+							<?php endforeach; ?>
+                        </div>
+					<?php endif; ?>
+					<?php if( !empty( $statsPHPExpanded ) ): ?>
+                        <div class="table" style="margin-top: calc(var(--spacing-unit) * 2); padding-top: calc(var(--spacing-unit) * 2); border-top: 1px solid rgba(255, 255, 255, 0.1);">
+							<?php foreach( $statsPHPExpanded as $label => $value ): ?>
+                                <div>
+                                    <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                    <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                </div>
+							<?php endforeach; ?>
+                        </div>
+					<?php endif; ?>
+					<?php if( !empty( $statsServerExpanded ) ): ?>
+                        <div class="table" style="margin-top: calc(var(--spacing-unit) * 2); padding-top: calc(var(--spacing-unit) * 2); border-top: 1px solid rgba(255, 255, 255, 0.1);">
+							<?php foreach( $statsServerExpanded as $label => $value ): ?>
                                 <div>
                                     <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
                                     <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
