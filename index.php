@@ -999,7 +999,7 @@ foreach( $faviconCandidates as $candidate ){
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
-            justify-content: flex-start;
+            justify-content: center;
         }
 
         .theme-toggle button {
@@ -1069,7 +1069,6 @@ foreach( $faviconCandidates as $candidate ){
             min-width: 0;
             display: flex;
             flex-direction: column;
-            max-height: calc(100vh - var(--body-padding-top) - var(--body-padding-bottom) - 80px);
         }
 
         main > .projects .projects-header {
