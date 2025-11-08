@@ -1241,12 +1241,15 @@ foreach( $faviconCandidates as $candidate ){
             margin-right: 16px;
             word-break: break-word;
             text-decoration: none;
-            transition: color 0.2s;
+            border-radius: 3px;
+            padding: 2px 4px;
         }
 
-        .recent ul li .name:hover {
-            color: var(--color-accent);
-            text-decoration: underline;
+        .recent ul li .name:hover,
+        .recent ul li .name:focus {
+            background-color: var(--color-secondary);
+            color: var(--color-bkg);
+            outline: none;
         }
 
         .recent ul li.dir .name {
@@ -1254,8 +1257,11 @@ foreach( $faviconCandidates as $candidate ){
             font-weight: bold;
         }
 
-        .recent ul li.dir .name:hover {
-            opacity: 0.8;
+        .recent ul li.dir .name:hover,
+        .recent ul li.dir .name:focus {
+            background-color: var(--color-accent);
+            color: var(--color-bkg);
+            outline: none;
         }
 
         .recent ul li small {
