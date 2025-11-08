@@ -2,7 +2,7 @@
 
 A beautiful, self-contained localhost homepage for local development environments. Display all your projects, server info, and quick links in one elegant interface.
 
-![Version](https://img.shields.io/badge/version-1.3.1-blue)
+![Version](https://img.shields.io/badge/version-1.3.2-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -283,6 +283,31 @@ The entire application is intentionally in one `index.php` file for:
 - **Easy Updates** - Replace one file to upgrade
 
 ## Version History
+
+### v1.3.2 (2025-01-08) - UX Enhancements & Bug Fixes
+
+**New Features**:
+- 🔗 **Clickable Recent Links** - Recent files/folders are now clickable hyperlinks
+- ➖ **Collapse Button** - Hide extended runtimes with "- hide" button
+- 🎨 **Consistent Styling** - Recent links match project links hover behavior
+
+**Bug Fixes**:
+- ✅ Fixed expand button stuck after collapsing extended runtimes
+- ✅ Cached runtime data now shows instantly on re-expand
+- ✅ Proper loading state management
+
+**User Experience**:
+- Recent items open in new tab on click
+- Background color change on hover (matches projects)
+- Toggle extended runtimes expand/collapse infinitely
+- Smooth transitions and visual consistency
+
+**Technical**:
+- Harmonized CSS hover styles across sections
+- Improved expand/collapse button logic
+- Better state management for runtime visibility
+
+**Breaking Changes**: None (fully backward compatible)
 
 ### v1.3.1 (2025-01-08) - Performance Optimization
 
