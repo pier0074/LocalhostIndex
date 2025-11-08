@@ -327,8 +327,50 @@ function detectRuntimes() {
 	return $runtimes;
 }
 
-// Detect all installed runtimes
-$info = detectRuntimes();
+// AJAX endpoint for extended runtime detection
+if( isset( $_GET['action'] ) && $_GET['action'] === 'detect_runtimes' ){
+	// Verify CSRF token if enabled
+	if( !empty( $options['security']['enable_csrf'] ) ){
+		if( !isset( $_GET['token'] ) || !hash_equals( $_SESSION['csrf_token'], $_GET['token'] ) ){
+			http_response_code( 403 );
+			die( json_encode( [ 'error' => 'Invalid token' ] ) );
+		}
+	}
+
+	header( 'Content-Type: application/json' );
+	echo json_encode( detectRuntimes() );
+	exit;
+}
+
+// Detect basic info only (fast - no shell sourcing)
+function detectBasicInfo() {
+	$info = [];
+
+	// Web Server
+	if( function_exists( 'apache_get_version' ) ){
+		$versionString = apache_get_version();
+		if( $versionString !== false ){
+			$parts = explode( '/', $versionString );
+			if( isset( $parts[1] ) ){
+				$info['Apache'] = explode( ' ', $parts[1] )[0];
+			}
+		}
+	}
+
+	// PHP (always available)
+	$info['PHP'] = explode( '-', phpversion() )[0];
+
+	// MySQL/MariaDB (relatively fast)
+	$mysqlVersion = detectMysqlVersion( [] );
+	if( $mysqlVersion && $mysqlVersion !== 'Unknown' ){
+		$info['MySQL'] = $mysqlVersion;
+	}
+
+	return $info;
+}
+
+// Load basic info only on page load
+$info = detectBasicInfo();
 
 // match a given filename against an array of patterns
 function filenameMatch( $patternArray, $filename ) {
@@ -1109,6 +1151,72 @@ foreach( $faviconCandidates as $candidate ){
             font-weight: 600;
         }
 
+        .expand-btn {
+            width: 100%;
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: var(--input-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: var(--color-accent);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .expand-btn:hover {
+            background: var(--input-focus-bg);
+            border-color: var(--color-accent);
+            transform: translateY(-1px);
+        }
+
+        .expand-btn:active {
+            transform: translateY(0);
+        }
+
+        .expand-btn.loading {
+            cursor: wait;
+            opacity: 0.6;
+        }
+
+        .expand-btn.expanded {
+            display: none;
+        }
+
+        #extended-info .table {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #extended-info .table > div {
+            margin: 7px 0;
+            color: var(--color-muted);
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        #extended-info .table > div > span:first-child {
+            flex: 1;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 11px;
+            color: var(--color-muted);
+        }
+
+        #extended-info .table > div > span:last-child {
+            flex-shrink: 0;
+            font-weight: bold;
+            padding: 0 3px;
+            border-radius: 3px;
+            text-align: right;
+        }
+
         .recent {
             margin-bottom: 24px;
         }
@@ -1372,7 +1480,7 @@ foreach( $faviconCandidates as $candidate ){
     <aside>
         <div class="info">
             <h2>info</h2>
-            <div class="table">
+            <div class="table" id="basic-info">
 				<?php foreach( $info as $label => $value ): ?>
                     <div class="<?= $label ?>">
                         <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
@@ -1380,6 +1488,11 @@ foreach( $faviconCandidates as $candidate ){
                     </div>
 				<?php endforeach; ?>
             </div>
+            <div id="extended-info" style="display: none;"></div>
+            <button id="expand-runtimes" class="expand-btn" aria-label="Show more runtimes">
+                <span class="expand-text">+ more runtimes</span>
+                <span class="loading-text" style="display: none;">loading...</span>
+            </button>
         </div>
 		<?php if( !empty( $options['extras'] ) ): ?>
             <div class="tools">
@@ -1554,6 +1667,64 @@ foreach( $faviconCandidates as $candidate ){
             window.location.href = url.toString();
         });
     });
+
+    // Expand runtimes button
+    const expandBtn = document.getElementById('expand-runtimes');
+    const extendedInfo = document.getElementById('extended-info');
+    let runtimesLoaded = false;
+
+    if (expandBtn) {
+        expandBtn.addEventListener('click', () => {
+            if (runtimesLoaded) return;
+
+            // Show loading state
+            expandBtn.classList.add('loading');
+            expandBtn.querySelector('.expand-text').style.display = 'none';
+            expandBtn.querySelector('.loading-text').style.display = 'inline';
+
+            // Build URL with CSRF token if needed
+            const url = new URL(window.location.href);
+            url.searchParams.set('action', 'detect_runtimes');
+<?php if( !empty( $options['security']['enable_csrf'] ) ): ?>
+            url.searchParams.set('token', '<?= $_SESSION['csrf_token'] ?>');
+<?php endif; ?>
+
+            // Fetch extended runtimes
+            fetch(url.toString())
+                .then(response => response.json())
+                .then(data => {
+                    // Remove basic info that's already displayed
+                    const basicKeys = ['Apache', 'PHP', 'MySQL'];
+                    const extended = Object.entries(data).filter(([key]) => !basicKeys.includes(key));
+
+                    if (extended.length > 0) {
+                        // Build HTML for extended runtimes
+                        const html = '<div class="table">' +
+                            extended.map(([label, value]) =>
+                                `<div class="${label}">` +
+                                `<span>${label}</span>` +
+                                `<span>${value}</span>` +
+                                `</div>`
+                            ).join('') +
+                            '</div>';
+
+                        extendedInfo.innerHTML = html;
+                        extendedInfo.style.display = 'block';
+                    }
+
+                    // Hide button
+                    expandBtn.classList.add('expanded');
+                    runtimesLoaded = true;
+                })
+                .catch(error => {
+                    console.error('Failed to load runtimes:', error);
+                    expandBtn.classList.remove('loading');
+                    expandBtn.querySelector('.expand-text').style.display = 'inline';
+                    expandBtn.querySelector('.expand-text').textContent = '⚠ failed to load';
+                    expandBtn.querySelector('.loading-text').style.display = 'none';
+                });
+        });
+    }
 </script>
 </body>
 </html>
