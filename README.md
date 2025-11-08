@@ -139,22 +139,87 @@ Set your preferred default theme:
 'theme' => 'matrix'  // or any other theme name
 ```
 
-## Security Considerations
+## Security Features (v1.1.0+)
 
-⚠️ **Important**: This tool is designed for **local development only**.
+LocalhostIndex now includes **built-in security options** for shared or public environments.
 
-### For Local Use Only
-- No authentication by default
-- Exposes phpinfo() via `?phpinfo=1`
+### Security Configuration
+
+Configure security settings in the `$options['security']` array:
+
+```php
+'security' => [
+    // Enable password authentication
+    'enable_authentication' => false,
+
+    // Set password hash (generate with: password_hash('your_password', PASSWORD_DEFAULT))
+    'password' => '',
+
+    // Disable phpinfo() for security
+    'disable_phpinfo' => false,
+
+    // Enable CSRF token protection (recommended)
+    'enable_csrf' => true,
+
+    // Strict path validation against traversal attacks
+    'strict_path_validation' => true,
+]
+```
+
+### Enabling Authentication
+
+To enable password protection:
+
+1. Generate a password hash:
+   ```php
+   echo password_hash('your_secure_password', PASSWORD_DEFAULT);
+   ```
+
+2. Update your configuration:
+   ```php
+   'security' => [
+       'enable_authentication' => true,
+       'password' => '$2y$10$...',  // paste your hash here
+   ]
+   ```
+
+### Security Features
+
+✅ **CSRF Protection** - Protects phpinfo() and sensitive endpoints
+✅ **Path Traversal Prevention** - Validates all file paths
+✅ **Password Authentication** - Optional login system
+✅ **Session Management** - Secure session handling
+✅ **Input Sanitization** - All user input is escaped
+✅ **Reduced Error Suppression** - Better error handling
+
+### For Local Use Only (Default Configuration)
+
+By default (all security features disabled):
+- No authentication required
+- phpinfo() accessible via `?phpinfo=1&token=<csrf_token>`
 - Shows directory structure
 - Displays server configuration
 
-### If Deploying Publicly
-**DO NOT use on public servers without:**
-1. Adding authentication (HTTP Basic Auth or password protection)
-2. Removing or protecting phpinfo() endpoint
-3. Restricting access via `.htaccess` or firewall
-4. Validating all file paths against traversal attacks
+**Recommended for**: Local development (localhost, 127.0.0.1)
+
+### For Shared/Public Servers
+
+**Enable these settings**:
+```php
+'security' => [
+    'enable_authentication' => true,
+    'password' => '<your_hash>',
+    'disable_phpinfo' => true,
+    'enable_csrf' => true,
+    'strict_path_validation' => true,
+]
+```
+
+**Additional recommendations**:
+- Use HTTPS
+- Configure firewall rules
+- Use `.htaccess` IP restrictions
+- Regular security audits
 
 ## Browser Compatibility
 
@@ -197,6 +262,25 @@ The entire application is intentionally in one `index.php` file for:
 - **Easy Updates** - Replace one file to upgrade
 
 ## Version History
+
+### v1.1.0 (2025-01-08) - Security Hardening Release
+
+**Security Improvements**:
+- ✅ Added optional password authentication system
+- ✅ CSRF token protection for phpinfo() endpoint
+- ✅ Path traversal validation for all file operations
+- ✅ Session-based security management
+- ✅ Configurable security options
+- ✅ Reduced error suppression operators
+- ✅ Input sanitization improvements
+
+**New Features**:
+- Login page for authenticated access
+- Security configuration options in `$options['security']`
+- Automatic CSRF token injection for phpinfo links
+- Strict path validation mode
+
+**Breaking Changes**: None (all security features are opt-in)
 
 ### v1.0.0 (2025-01-08)
 - Initial release

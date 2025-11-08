@@ -1,8 +1,16 @@
 <?php
+/**
+ * LocalhostIndex - Security Hardened Version
+ * A beautiful localhost homepage for local development environments.
+ *
+ * SECURITY: This tool is for LOCAL DEVELOPMENT ONLY.
+ * Set 'enable_security' => true if deploying on shared/public servers.
+ */
+
 $options = [
 	/**
 	 * Set the theme
-	 * Available themes: bluey, pinky, purply
+	 * Available themes: bluey, sunny, forest, retro, matrix, nebula, sundown, monochrome, dark, light
 	 */
 	'theme' => 'bluey',
 
@@ -16,6 +24,7 @@ $options = [
 	 * Add extra tools
 	 * [label] => '[link of the tool]
 	 * eg: 'phpMyAdmin' => 'http://localhost/phpMyAdmin'
+	 * Note: phpinfo link will automatically include CSRF token if enabled
 	 */
 	'extras' => [
 		'phpinfo()' => '?phpinfo=1',
@@ -41,11 +50,123 @@ $options = [
 	 *       'timeout' => 2
 	 *   ]
 	 */
-	'mysql' => []
+	'mysql' => [],
+
+	/**
+	 * Security Settings
+	 * Enable these for shared or public-facing servers
+	 */
+	'security' => [
+		// Enable authentication (recommended for non-localhost)
+		'enable_authentication' => false,
+		// Simple password protection (use strong password if enabled)
+		'password' => '',  // Leave empty to disable, or set a password hash via password_hash('your_password', PASSWORD_DEFAULT)
+		// Disable phpinfo for security
+		'disable_phpinfo' => false,
+		// Enable CSRF protection
+		'enable_csrf' => true,
+		// Validate all paths against traversal
+		'strict_path_validation' => true,
+	]
 ];
 
-// display phpinfo
+// Security: Session management
+session_start();
+
+// Security: Generate CSRF token
+if( !isset( $_SESSION['csrf_token'] ) ){
+	$_SESSION['csrf_token'] = bin2hex( random_bytes( 32 ) );
+}
+
+// Security: Simple authentication check
+if( !empty( $options['security']['enable_authentication'] ) && !empty( $options['security']['password'] ) ){
+	if( !isset( $_SESSION['authenticated'] ) ){
+		// Handle login form
+		if( isset( $_POST['password'] ) && isset( $_POST['csrf_token'] ) ){
+			if( hash_equals( $_SESSION['csrf_token'], $_POST['csrf_token'] ) ){
+				if( password_verify( $_POST['password'], $options['security']['password'] ) ){
+					$_SESSION['authenticated'] = true;
+					header( 'Location: ' . $_SERVER['PHP_SELF'] );
+					exit;
+				} else {
+					$login_error = 'Invalid password';
+				}
+			}
+		}
+
+		// Show login form
+		if( !isset( $_SESSION['authenticated'] ) ){
+			?>
+			<!DOCTYPE html>
+			<html lang="en">
+			<head>
+				<meta charset="utf-8">
+				<meta name="viewport" content="width=device-width, initial-scale=1">
+				<title>LocalhostIndex - Login</title>
+				<style>
+					body { font-family: monospace; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #102252; color: #f4f6ff; margin: 0; }
+					.login-box { background: rgba(255,255,255,0.05); padding: 40px; border-radius: 8px; max-width: 350px; }
+					h1 { margin-top: 0; font-size: 18px; letter-spacing: 2px; }
+					input { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 4px; font-family: monospace; box-sizing: border-box; }
+					button { width: 100%; padding: 12px; background: #d9e009; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: monospace; }
+					button:hover { opacity: 0.9; }
+					.error { color: #ff6b6b; margin: 10px 0; font-size: 13px; }
+				</style>
+			</head>
+			<body>
+				<div class="login-box">
+					<h1>LOCALHOSTINDEX</h1>
+					<?php if( isset( $login_error ) ): ?>
+						<div class="error"><?= htmlspecialchars( $login_error, ENT_QUOTES, 'UTF-8' ); ?></div>
+					<?php endif; ?>
+					<form method="post">
+						<input type="password" name="password" placeholder="Password" required autofocus>
+						<input type="hidden" name="csrf_token" value="<?= htmlspecialchars( $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8' ); ?>">
+						<button type="submit">Login</button>
+					</form>
+				</div>
+			</body>
+			</html>
+			<?php
+			exit;
+		}
+	}
+}
+
+// Security: Validate and sanitize paths
+function validatePath( $filename, $strict = true ) {
+	// Prevent path traversal
+	if( strpos( $filename, '..' ) !== false || strpos( $filename, '/' ) !== false || strpos( $filename, '\\' ) !== false ){
+		return false;
+	}
+
+	// Additional strict validation
+	if( $strict ){
+		$realPath = realpath( __DIR__ . '/' . $filename );
+		if( $realPath === false || strpos( $realPath, __DIR__ ) !== 0 ){
+			return false;
+		}
+	}
+
+	return true;
+}
+
+// display phpinfo with CSRF protection
 if( !empty( $_GET['phpinfo'] ) ){
+	// Check if phpinfo is disabled
+	if( !empty( $options['security']['disable_phpinfo'] ) ){
+		http_response_code( 403 );
+		die( 'phpinfo() has been disabled for security.' );
+	}
+
+	// CSRF protection
+	if( !empty( $options['security']['enable_csrf'] ) ){
+		if( !isset( $_GET['token'] ) || !hash_equals( $_SESSION['csrf_token'], $_GET['token'] ) ){
+			http_response_code( 403 );
+			die( 'Invalid security token.' );
+		}
+	}
+
 	phpinfo();
 	exit;
 }
@@ -117,7 +238,7 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 
 	if( $shell_available ){
 		foreach( [ 'command -v mysql', 'which mysql', 'command -v mysqld', 'which mysqld' ] as $probe ){
-			$probe_result = trim( (string) @shell_exec( $probe . ' 2>/dev/null' ) );
+			$probe_result = trim( (string) shell_exec( $probe . ' 2>/dev/null' ) );
 			if( $probe_result !== '' ){
 				$binary_candidates[] = $probe_result;
 			}
@@ -140,7 +261,7 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 				continue;
 			}
 			$escaped_binary = escapeshellarg( $binary );
-			$output = trim( (string) @shell_exec( $escaped_binary . ' --version 2>/dev/null' ) );
+			$output = trim( (string) shell_exec( $escaped_binary . ' --version 2>/dev/null' ) );
 			if( $output === '' ){
 				continue;
 			}
@@ -204,7 +325,7 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 
 	$database_url = getenv( 'DATABASE_URL' ) ?: getenv( 'JAWSDB_URL' ) ?: getenv( 'CLEARDB_DATABASE_URL' );
 	if( !empty( $database_url ) ){
-		$url_parts = @parse_url( $database_url );
+		$url_parts = parse_url( $database_url );
 		if( is_array( $url_parts ) ){
 			if( empty( $user ) && !empty( $url_parts['user'] ) ){
 				$user = $url_parts['user'];
@@ -230,11 +351,12 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 	$password = $password !== null ? (string) $password : '';
 
 	if( !empty( $user ) || $socket !== null ){
-		$mysqli = @mysqli_init();
+		$mysqli = mysqli_init();
 		if( $mysqli ){
 			if( defined( 'MYSQLI_OPT_CONNECT_TIMEOUT' ) ){
-				@mysqli_options( $mysqli, MYSQLI_OPT_CONNECT_TIMEOUT, $timeout );
+				mysqli_options( $mysqli, MYSQLI_OPT_CONNECT_TIMEOUT, $timeout );
 			}
+			// Suppress connection errors as this is detection, not critical functionality
 			$connected = @mysqli_real_connect(
 				$mysqli,
 				$host,
@@ -313,6 +435,12 @@ if( $handle = opendir( './' ) ){
 			continue;
 		}
 
+		// Security: Validate path against traversal attacks
+		$strict_validation = $options['security']['strict_path_validation'] ?? true;
+		if( !validatePath( $item, $strict_validation ) ){
+			continue;
+		}
+
 		$item_type = is_dir( $item ) ? 'dir' : 'file';
 		$order = ( $item_type == 'dir' ) ? 1 : 0;
 		$item_list[] = [
@@ -346,8 +474,8 @@ foreach( $directory_list as $item ){
 	$file_count += $is_dir ? 0 : 1;
 
 	$path = __DIR__ . '/' . $item['name'];
-	$mtime = @filemtime( $path ) ?: 0;
-	if( $mtime > 0 ){
+	$mtime = filemtime( $path );
+	if( $mtime !== false && $mtime > 0 ){
 		$recent_items[] = $item + [
 			'mtime' => $mtime,
 		];
@@ -368,9 +496,9 @@ if( $file_count > 0 ){
 if( $latest_item ){
 	$stats['Last update'] = formatRelativeTime( $latest_mtime ) . ' · ' . $latest_item['name'];
 }
-$disk_total = @disk_total_space( __DIR__ );
-$disk_free = @disk_free_space( __DIR__ );
-if( $disk_total > 0 && $disk_free !== false ){
+$disk_total = disk_total_space( __DIR__ );
+$disk_free = disk_free_space( __DIR__ );
+if( $disk_total !== false && $disk_total > 0 && $disk_free !== false ){
 	$free_percent = round( ( $disk_free / $disk_total ) * 100 );
 	$stats['Disk free'] = humanFileSize( $disk_free ) . ' (' . $free_percent . '%)';
 }
@@ -988,8 +1116,15 @@ foreach( $favicon_candidates as $candidate ){
             <div class="tools">
                 <h2>extras</h2>
                 <ul>
-					<?php foreach( $options['extras'] as $label => $link ): ?>
-                        <li><a target="_blank" href="<?= htmlspecialchars( $link, ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></a></li>
+					<?php foreach( $options['extras'] as $label => $link ):
+						// Add CSRF token to phpinfo links if CSRF is enabled
+						$final_link = $link;
+						if( !empty( $options['security']['enable_csrf'] ) && strpos( $link, 'phpinfo' ) !== false ){
+							$separator = strpos( $link, '?' ) !== false ? '&' : '?';
+							$final_link = $link . $separator . 'token=' . urlencode( $_SESSION['csrf_token'] );
+						}
+					?>
+                        <li><a target="_blank" href="<?= htmlspecialchars( $final_link, ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></a></li>
 					<?php endforeach; ?>
                 </ul>
             </div>
