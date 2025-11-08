@@ -1348,6 +1348,11 @@ foreach( $faviconCandidates as $candidate ){
             font-weight: bold;
         }
 
+        .sort-btn.active.reversed::after {
+            content: ' ↓';
+            font-size: 0.9em;
+        }
+
         .sort-btn:focus-visible {
             outline: 2px solid var(--color-accent);
             outline-offset: 2px;
@@ -2162,9 +2167,11 @@ foreach( $faviconCandidates as $candidate ){
         });
     });
 
-    // Sort button handlers (client-side, instant sorting)
+    // Sort button handlers (client-side, instant sorting with reverse)
     const sortButtons = document.querySelectorAll('.sort-btn');
     const projectList = document.querySelector('.projects .content ul');
+    let currentSort = null;
+    let isReversed = false;
 
     if (projectList) {
         sortButtons.forEach((btn) => {
@@ -2173,9 +2180,23 @@ foreach( $faviconCandidates as $candidate ){
                 e.stopPropagation();
                 const sortType = btn.dataset.sort;
 
+                // Check if clicking the same button (toggle reverse)
+                if (currentSort === sortType) {
+                    isReversed = !isReversed;
+                } else {
+                    isReversed = false;
+                    currentSort = sortType;
+                }
+
                 // Update active state
-                sortButtons.forEach(b => b.classList.remove('active'));
+                sortButtons.forEach(b => {
+                    b.classList.remove('active');
+                    b.classList.remove('reversed');
+                });
                 btn.classList.add('active');
+                if (isReversed) {
+                    btn.classList.add('reversed');
+                }
 
                 // Get all list items
                 const items = Array.from(projectList.children);
@@ -2189,21 +2210,24 @@ foreach( $faviconCandidates as $candidate ){
                         return typeA - typeB;
                     }
 
-                    // Then sort by the selected criterion
+                    // Then sort by the selected criterion within each type
+                    let result = 0;
                     if (sortType === 'name') {
                         const nameA = (a.dataset.name || '').toLowerCase();
                         const nameB = (b.dataset.name || '').toLowerCase();
-                        return nameA.localeCompare(nameB);
+                        result = nameA.localeCompare(nameB);
                     } else if (sortType === 'date') {
                         const dateA = parseInt(a.dataset.modified || '0');
                         const dateB = parseInt(b.dataset.modified || '0');
-                        return dateB - dateA; // Newest first
+                        result = dateB - dateA; // Newest first by default
                     } else if (sortType === 'size') {
                         const sizeA = parseInt(a.dataset.size || '0');
                         const sizeB = parseInt(b.dataset.size || '0');
-                        return sizeB - sizeA; // Largest first
+                        result = sizeB - sizeA; // Largest first by default
                     }
-                    return 0;
+
+                    // Reverse if needed
+                    return isReversed ? -result : result;
                 });
 
                 // Clear and re-append in sorted order
