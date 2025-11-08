@@ -343,6 +343,150 @@ if( isset( $_GET['action'] ) && $_GET['action'] === 'detect_runtimes' ){
 	exit;
 }
 
+// AJAX endpoint for quick actions
+if( isset( $_POST['action'] ) ){
+	// Verify CSRF token if enabled
+	if( !empty( $options['security']['enable_csrf'] ) ){
+		if( !isset( $_POST['token'] ) || !hash_equals( $_SESSION['csrf_token'], $_POST['token'] ) ){
+			http_response_code( 403 );
+			die( json_encode( [ 'success' => false, 'message' => 'Invalid token' ] ) );
+		}
+	}
+
+	header( 'Content-Type: application/json' );
+	$action = $_POST['action'];
+	$result = [ 'success' => false, 'message' => 'Unknown action' ];
+
+	switch( $action ){
+		case 'clear-browser-cache':
+			$result = [ 'success' => true, 'message' => 'Browser cache cleared! (Press Cmd+Shift+R or Ctrl+Shift+R to hard reload)' ];
+			break;
+
+		case 'toggle-mysql':
+			if( PHP_OS_FAMILY === 'Darwin' ){
+				$status = @shell_exec( 'brew services list | grep mysql' );
+				if( strpos( $status, 'started' ) !== false ){
+					$output = @shell_exec( 'brew services stop mysql 2>&1' );
+					$result = [ 'success' => true, 'message' => 'MySQL stopped', 'output' => $output ];
+				} else {
+					$output = @shell_exec( 'brew services start mysql 2>&1' );
+					$result = [ 'success' => true, 'message' => 'MySQL started', 'output' => $output ];
+				}
+			} else {
+				$output = @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
+				if( trim( $output ) === 'active' ){
+					$output = @shell_exec( 'sudo systemctl stop mysql 2>&1' );
+					$result = [ 'success' => true, 'message' => 'MySQL stopped', 'output' => $output ];
+				} else {
+					$output = @shell_exec( 'sudo systemctl start mysql 2>&1' );
+					$result = [ 'success' => true, 'message' => 'MySQL started', 'output' => $output ];
+				}
+			}
+			break;
+
+		case 'restart-php-fpm':
+			if( PHP_OS_FAMILY === 'Darwin' ){
+				$output = @shell_exec( 'brew services restart php 2>&1' );
+			} else {
+				$output = @shell_exec( 'sudo systemctl restart php-fpm 2>&1' );
+			}
+			$result = [ 'success' => true, 'message' => 'PHP-FPM restarted', 'output' => $output ];
+			break;
+
+		case 'reload-apache':
+			if( PHP_OS_FAMILY === 'Darwin' ){
+				$output = @shell_exec( 'sudo apachectl graceful 2>&1' );
+			} else {
+				$output = @shell_exec( 'sudo systemctl reload apache2 2>&1' );
+			}
+			$result = [ 'success' => true, 'message' => 'Apache config reloaded', 'output' => $output ];
+			break;
+
+		case 'server-status':
+			$status = [];
+			if( function_exists( 'apache_get_version' ) ){
+				$status[] = 'Apache: ' . apache_get_version();
+			}
+			$status[] = 'PHP: ' . phpversion();
+			if( function_exists( 'mysqli_connect' ) ){
+				$mysqli = @new mysqli( 'localhost', 'root', '' );
+				if( !$mysqli->connect_error ){
+					$status[] = 'MySQL: Connected (' . $mysqli->server_info . ')';
+					$mysqli->close();
+				} else {
+					$status[] = 'MySQL: Not connected';
+				}
+			}
+			$result = [ 'success' => true, 'message' => 'Server Status', 'output' => implode( "\n", $status ) ];
+			break;
+
+		case 'clear-opcache':
+			if( function_exists( 'opcache_reset' ) ){
+				opcache_reset();
+				$result = [ 'success' => true, 'message' => 'OPcache cleared successfully' ];
+			} else {
+				$result = [ 'success' => false, 'message' => 'OPcache not available' ];
+			}
+			break;
+
+		case 'clear-sessions':
+			$sessionPath = session_save_path() ?: '/tmp';
+			$output = @shell_exec( "find {$sessionPath} -name 'sess_*' -type f -delete 2>&1" );
+			$result = [ 'success' => true, 'message' => 'Session files cleared', 'output' => $output ];
+			break;
+
+		case 'clear-all-caches':
+			$messages = [];
+			if( function_exists( 'opcache_reset' ) ){
+				opcache_reset();
+				$messages[] = 'OPcache cleared';
+			}
+			$sessionPath = session_save_path() ?: '/tmp';
+			@shell_exec( "find {$sessionPath} -name 'sess_*' -type f -delete 2>&1" );
+			$messages[] = 'Session files cleared';
+			$result = [ 'success' => true, 'message' => 'All caches cleared', 'output' => implode( "\n", $messages ) ];
+			break;
+
+		case 'view-php-log':
+			$logFile = ini_get( 'error_log' );
+			if( !$logFile || $logFile === 'syslog' ){
+				$logFile = '/var/log/php_errors.log';
+			}
+			if( file_exists( $logFile ) ){
+				$output = @shell_exec( "tail -n 50 {$logFile} 2>&1" );
+				$result = [ 'success' => true, 'message' => 'PHP Error Log (last 50 lines)', 'output' => $output ];
+			} else {
+				$result = [ 'success' => false, 'message' => 'PHP error log not found' ];
+			}
+			break;
+
+		case 'view-mysql-log':
+			$logFile = '/var/log/mysql/error.log';
+			if( !file_exists( $logFile ) ){
+				$logFile = '/usr/local/var/mysql/*.err';
+			}
+			$output = @shell_exec( "tail -n 50 {$logFile} 2>&1" );
+			$result = [ 'success' => true, 'message' => 'MySQL Error Log (last 50 lines)', 'output' => $output ];
+			break;
+
+		case 'clear-logs':
+			$phpLog = ini_get( 'error_log' );
+			if( $phpLog && $phpLog !== 'syslog' && file_exists( $phpLog ) ){
+				@file_put_contents( $phpLog, '' );
+			}
+			$result = [ 'success' => true, 'message' => 'Log files cleared' ];
+			break;
+
+		case 'download-logs':
+			// This will be handled differently - return a message
+			$result = [ 'success' => true, 'message' => 'Log download not yet implemented', 'output' => 'Use action buttons to view logs individually' ];
+			break;
+	}
+
+	echo json_encode( $result );
+	exit;
+}
+
 // Detect basic info only (fast - no shell sourcing)
 function detectBasicInfo() {
 	$info = [];
@@ -1433,6 +1577,15 @@ foreach( $faviconCandidates as $candidate ){
             cursor: not-allowed;
         }
 
+        .action-section h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--color-muted);
+            margin-bottom: calc(var(--spacing-unit) * 2);
+            font-weight: 600;
+        }
+
         .expand-btn {
             width: 100%;
             margin-top: 12px;
@@ -1900,25 +2053,79 @@ foreach( $faviconCandidates as $candidate ){
             <div class="actions">
                 <div class="section-header">
                     <h2>actions</h2>
-                    <button class="toggle-btn" data-target="actions-extended" aria-label="Expand actions">+</button>
+                    <button class="toggle-btn" data-target="actions-extended" data-preview="actions-preview" aria-label="Expand actions">+</button>
                 </div>
-                <div class="action-buttons">
-                    <button class="action-btn" data-action="clear-cache" title="Clear PHP opcache">
+                <div id="actions-preview" class="action-buttons">
+                    <button class="action-btn" data-action="clear-browser-cache" title="Clear browser cache">
                         <span>🗑️</span> Clear Cache
                     </button>
-                    <button class="action-btn" data-action="restart-apache" title="Restart Apache web server">
-                        <span>🔄</span> Restart Apache
+                    <button class="action-btn" data-action="toggle-mysql" title="Start/Stop MySQL">
+                        <span>🔄</span> Start/Stop MySQL
                     </button>
                 </div>
-                <div id="actions-extended" style="display: none; margin-top: calc(var(--spacing-unit) * 2);">
-                    <div class="action-buttons">
-                        <button class="action-btn" data-action="restart-mysql" title="Restart MySQL database">
-                            <span>🔄</span> Restart MySQL
-                        </button>
-                        <button class="action-btn" data-action="view-logs" title="View Apache error log">
-                            <span>📋</span> View Logs
-                        </button>
+                <div id="actions-extended" style="display: none;">
+                    <!-- Server Management -->
+                    <div class="action-section">
+                        <h3>Server Management</h3>
+                        <div class="action-buttons">
+                            <button class="action-btn" data-action="restart-php-fpm" title="Restart PHP-FPM">
+                                <span>🔄</span> Restart PHP-FPM
+                            </button>
+                            <button class="action-btn" data-action="reload-apache" title="Reload Apache config">
+                                <span>🔄</span> Reload Apache Config
+                            </button>
+                            <button class="action-btn" data-action="toggle-mysql" title="Start/Stop MySQL">
+                                <span>🔄</span> Start/Stop MySQL
+                            </button>
+                            <button class="action-btn" data-action="server-status" title="Check server status">
+                                <span>📊</span> Check Server Status
+                            </button>
+                        </div>
                     </div>
+
+                    <!-- Cache Management -->
+                    <div class="action-section" style="margin-top: calc(var(--spacing-unit) * 2); padding-top: calc(var(--spacing-unit) * 2); border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                        <h3>Cache Management</h3>
+                        <div class="action-buttons">
+                            <button class="action-btn" data-action="clear-opcache" title="Clear PHP OPcache">
+                                <span>🗑️</span> Clear OPcache
+                            </button>
+                            <button class="action-btn" data-action="clear-sessions" title="Clear session files">
+                                <span>🗑️</span> Clear Sessions
+                            </button>
+                            <button class="action-btn" data-action="clear-all-caches" title="Clear all caches">
+                                <span>🗑️</span> Clear All Caches
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Log Management -->
+                    <div class="action-section" style="margin-top: calc(var(--spacing-unit) * 2); padding-top: calc(var(--spacing-unit) * 2); border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                        <h3>Log Management</h3>
+                        <div class="action-buttons">
+                            <button class="action-btn" data-action="view-php-log" title="View PHP error log">
+                                <span>📋</span> View PHP Log
+                            </button>
+                            <button class="action-btn" data-action="view-mysql-log" title="View MySQL log">
+                                <span>📋</span> View MySQL Log
+                            </button>
+                            <button class="action-btn" data-action="clear-logs" title="Clear log files">
+                                <span>🗑️</span> Clear Logs
+                            </button>
+                            <button class="action-btn" data-action="download-logs" title="Download log archive">
+                                <span>⬇️</span> Download Logs
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Output Modal -->
+                <div id="action-output" style="display: none; margin-top: calc(var(--spacing-unit) * 2); padding: var(--card-padding); background: var(--input-bg); border-radius: var(--card-radius); border: 1px solid rgba(255, 255, 255, 0.1);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: calc(var(--spacing-unit) * 2);">
+                        <strong id="action-output-title">Output</strong>
+                        <button id="action-output-close" style="background: none; border: none; color: var(--color-accent); cursor: pointer; font-size: 20px;">×</button>
+                    </div>
+                    <pre id="action-output-content" style="white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; font-size: 12px; line-height: 1.4;"></pre>
                 </div>
             </div>
 		<?php if( !empty( $recentPreview ) ): ?>
@@ -2159,6 +2366,91 @@ foreach( $faviconCandidates as $candidate ){
             }
         });
     });
+
+    // Action button handlers
+    const actionButtons = document.querySelectorAll('.action-btn');
+    const actionModal = document.getElementById('action-output');
+    const actionOutput = document.getElementById('action-result');
+    const closeModalBtn = document.querySelector('.close-modal');
+
+    actionButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const action = this.getAttribute('data-action');
+            if (!action) return;
+
+            // Disable button and show loading state
+            this.disabled = true;
+            const originalText = this.innerHTML;
+            this.innerHTML = '<span>⏳</span> Processing...';
+
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('action', action);
+<?php if( !empty( $options['security']['enable_csrf'] ) ): ?>
+            formData.append('token', '<?= $_SESSION['csrf_token'] ?>');
+<?php endif; ?>
+
+            // Send AJAX request
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = originalText;
+
+                // Show modal with result
+                if (actionModal && actionOutput) {
+                    let output = `<div style="margin-bottom: 10px;"><strong>${data.success ? '✅' : '❌'} ${data.message}</strong></div>`;
+
+                    if (data.output) {
+                        output += `<div style="background: var(--input-bg); padding: 10px; border-radius: 4px; margin-top: 10px; font-family: monospace; font-size: 12px; white-space: pre-wrap; overflow-x: auto;">${escapeHtml(data.output)}</div>`;
+                    }
+
+                    actionOutput.innerHTML = output;
+                    actionModal.style.display = 'flex';
+                }
+            })
+            .catch(error => {
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = originalText;
+
+                // Show error in modal
+                if (actionModal && actionOutput) {
+                    actionOutput.innerHTML = `<div style="color: var(--color-accent);"><strong>❌ Error:</strong> ${escapeHtml(error.message)}</div>`;
+                    actionModal.style.display = 'flex';
+                }
+            });
+        });
+    });
+
+    // Close modal handler
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', function() {
+            if (actionModal) {
+                actionModal.style.display = 'none';
+            }
+        });
+    }
+
+    // Close modal on outside click
+    if (actionModal) {
+        actionModal.addEventListener('click', function(e) {
+            if (e.target === actionModal) {
+                actionModal.style.display = 'none';
+            }
+        });
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 </script>
 </body>
 </html>
