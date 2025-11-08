@@ -932,6 +932,10 @@ foreach( $faviconCandidates as $candidate ){
         <link rel="icon" href="<?= htmlspecialchars( $faviconHref, ENT_QUOTES, 'UTF-8' ); ?>">
     <?php endif; ?>
     <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         :root {
             --color-bkg: <?=$theme['background']?>;
             --color-accent: <?=$theme['accent']?>;
@@ -942,6 +946,22 @@ foreach( $faviconCandidates as $candidate ){
             --input-bg: <?=$theme['input_bg'] ?? 'rgba(255, 255, 255, 0.06)'?>;
             --input-focus-bg: <?=$theme['input_focus_bg'] ?? 'rgba(204, 204, 204, 0.05)'?>;
             --input-text: <?=$theme['input_text'] ?? '#dfdfdf'?>;
+
+            /* Layout Variables */
+            --spacing-unit: 8px;
+            --card-padding: 12px;
+            --card-radius: 6px;
+            --card-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+            --card-bg: rgba(255, 255, 255, 0.02);
+            --container-max-width: 1400px;
+            --grid-gap: 32px;
+            --body-padding-top: 24px;
+            --body-padding-bottom: 24px;
+            --body-padding-x: clamp(16px, 3vw, 32px);
+        }
+
+        html {
+            height: 100%;
         }
 
         body {
@@ -949,7 +969,7 @@ foreach( $faviconCandidates as $candidate ){
             background: var(--color-bkg);
             color: var(--color-text);
             margin: 0;
-            padding: 80px 40px 50px;
+            padding: var(--body-padding-top) var(--body-padding-x) var(--body-padding-bottom);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -967,18 +987,19 @@ foreach( $faviconCandidates as $candidate ){
             letter-spacing: 3px;
         }
 
+        .theme {
+            margin-bottom: calc(var(--spacing-unit) * 3);
+            padding: var(--card-padding);
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+        }
+
         .theme-toggle {
-            position: fixed;
-            top: 24px;
-            right: 24px;
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
-            padding: 10px 14px;
-            border-radius: 999px;
-            background: rgba(0, 0, 0, 0.25);
-            backdrop-filter: blur(8px);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
-            z-index: 10;
+            justify-content: center;
         }
 
         .theme-toggle button {
@@ -1034,20 +1055,21 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         main {
-            width: min(1100px, 95vw);
-            margin: 8px auto 45px;
-            display: flex;
-            justify-content: center;
-            gap: 36px;
+            display: grid;
+            grid-template-columns: minmax(0, 2.4fr) minmax(280px, 1fr);
+            gap: var(--grid-gap);
+            width: 100%;
+            max-width: var(--container-max-width);
+            margin: 0 auto;
+            padding: 0;
             color: var(--color-text);
         }
 
         main > .projects {
-            flex: 2.4;
             min-width: 0;
             display: flex;
             flex-direction: column;
-            max-height: 600px;
+            height: calc(100vh - var(--body-padding-top) - var(--body-padding-bottom));
         }
 
         main > .projects .projects-header {
@@ -1104,14 +1126,17 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         main > aside {
-            flex: 1.2;
             min-width: 280px;
         }
 
 
         .info,
         .stats {
-            margin-bottom: 24px;
+            margin-bottom: calc(var(--spacing-unit) * 3);
+            padding: var(--card-padding);
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
         }
 
         .info .table > div,
@@ -1218,7 +1243,11 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .recent {
-            margin-bottom: 24px;
+            margin-bottom: calc(var(--spacing-unit) * 3);
+            padding: var(--card-padding);
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
         }
 
         .recent ul {
@@ -1243,6 +1272,7 @@ foreach( $faviconCandidates as $candidate ){
             text-decoration: none;
             border-radius: 3px;
             padding: 2px 4px;
+            transition: all 0.2s ease;
         }
 
         .recent ul li .name:hover,
@@ -1274,9 +1304,11 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .projects {
-            padding-right: 40px;
-            padding-left: 2px;
+            padding: var(--card-padding);
             max-width: 100%;
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
         }
 
         .projects .content {
@@ -1344,6 +1376,7 @@ foreach( $faviconCandidates as $candidate ){
             padding: 2px 4px;
             flex: 1;
             min-width: 0;
+            transition: all 0.2s ease;
         }
 
         .projects ul li .file-size {
@@ -1377,6 +1410,10 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .tools {
+            padding: var(--card-padding);
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
         }
 
         .tools ul {
@@ -1399,6 +1436,7 @@ foreach( $faviconCandidates as $candidate ){
             border-radius: 3px;
             font-size: 14px;
             padding: 2px 4px;
+            transition: all 0.2s ease;
         }
 
         .tools ul li a:hover {
@@ -1406,15 +1444,19 @@ foreach( $faviconCandidates as $candidate ){
             color: var(--color-bkg);
         }
 
+        @media screen and (max-width: 900px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media screen and (max-width: 500px) {
-            body {
-                padding: 80px 12px 45px;
+            :root {
+                --body-padding-x: 12px;
+                --grid-gap: 24px;
             }
 
             .theme-toggle {
-                top: 16px;
-                right: 16px;
-                padding: 8px 12px;
                 gap: 8px;
             }
 
@@ -1423,48 +1465,59 @@ foreach( $faviconCandidates as $candidate ){
                 height: 16px;
             }
 
-            main {
-                margin: 16px 0 45px;
-                max-height: none;
-                flex-direction: column;
-                gap: 28px;
-            }
-
             main > aside {
                 order: 2;
                 min-width: 0;
             }
 
-            .projects {
-                padding-left: 0;
-                padding-right: 0;
+            .projects ul li {
+                margin: 12px 0;
+            }
+
+            .projects ul li a {
+                padding: 12px 8px;
+                font-size: 14px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
             }
 
             .recent ul li {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 4px;
+                padding: 8px 0;
+            }
+
+            .recent ul li .name {
+                padding: 8px 12px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
             }
 
             .recent ul li small {
                 margin-left: 0;
+            }
+
+            .tools ul li a {
+                padding: 12px 8px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                font-size: 15px;
+            }
+
+            .sort-btn {
+                padding: 12px 16px;
+                font-size: 14px;
+                min-height: 44px;
             }
         }
     </style>
 </head>
 
 <body>
-<div class="theme-toggle" role="group" aria-label="Theme selector">
-	<?php foreach( $themeOrder as $idx => $key ): ?>
-        <button
-            type="button"
-            data-theme-key="<?= htmlspecialchars( $key, ENT_QUOTES, 'UTF-8' ); ?>"
-            aria-pressed="<?= $idx === $defaultThemeIndex ? 'true' : 'false'; ?>"
-            aria-label="<?= htmlspecialchars( $themes[ $key ]['label'], ENT_QUOTES, 'UTF-8' ); ?>"
-            style="--theme-accent: <?= htmlspecialchars( $themes[ $key ]['accent'], ENT_QUOTES, 'UTF-8' ); ?>;"
-        ></button>
-	<?php endforeach; ?>
-</div>
 <main>
     <div class="projects">
         <div class="projects-header">
@@ -1495,6 +1548,20 @@ foreach( $faviconCandidates as $candidate ){
         </div>
     </div>
     <aside>
+        <div class="theme">
+            <h2>theme</h2>
+            <div class="theme-toggle" role="group" aria-label="Theme selector">
+                <?php foreach( $themeOrder as $idx => $key ): ?>
+                <button
+                    type="button"
+                    data-theme-key="<?= htmlspecialchars( $key, ENT_QUOTES, 'UTF-8' ); ?>"
+                    aria-pressed="<?= $idx === $defaultThemeIndex ? 'true' : 'false'; ?>"
+                    aria-label="<?= htmlspecialchars( $themes[ $key ]['label'], ENT_QUOTES, 'UTF-8' ); ?>"
+                    style="--theme-accent: <?= htmlspecialchars( $themes[ $key ]['accent'], ENT_QUOTES, 'UTF-8' ); ?>;"
+                ></button>
+                <?php endforeach; ?>
+            </div>
+        </div>
         <div class="info">
             <h2>info</h2>
             <div class="table" id="basic-info">
