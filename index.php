@@ -2203,14 +2203,17 @@ foreach( $faviconCandidates as $candidate ){
 
                 // Sort items
                 items.sort((a, b) => {
-                    // Always sort directories before files
-                    const typeA = a.classList.contains('dir') ? 0 : 1;
-                    const typeB = b.classList.contains('dir') ? 0 : 1;
-                    if (typeA !== typeB) {
-                        return typeA - typeB;
+                    // For name sorting: directories before files
+                    // For date/size sorting: mix directories and files together
+                    if (sortType === 'name') {
+                        const typeA = a.classList.contains('dir') ? 0 : 1;
+                        const typeB = b.classList.contains('dir') ? 0 : 1;
+                        if (typeA !== typeB) {
+                            return typeA - typeB;
+                        }
                     }
 
-                    // Then sort by the selected criterion within each type
+                    // Sort by the selected criterion
                     let result = 0;
                     if (sortType === 'name') {
                         const nameA = (a.dataset.name || '').toLowerCase();
