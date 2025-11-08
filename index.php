@@ -731,75 +731,78 @@ foreach( $directoryList as $item ){
 }
 
 // Stats: Preview (folded) and Extended (expanded)
+// When expanded, show all stats in order with separator between project and system stats
 $statsPreview = [];
-$statsExtended = [];
+$statsProjectExpanded = [];
+$statsSystemExpanded = [];
+
+// Get disk info first (used in both preview and expanded)
+$diskTotal = disk_total_space( __DIR__ );
+$diskFree = disk_free_space( __DIR__ );
 
 // Preview stats (always visible when folded)
 if( $projectCount > 0 ){
 	$statsPreview['Projects'] = number_format( $projectCount );
 }
-
-$diskTotal = disk_total_space( __DIR__ );
-$diskFree = disk_free_space( __DIR__ );
 if( $diskTotal !== false && $diskTotal > 0 && $diskFree !== false ){
 	$freePercent = round( ( $diskFree / $diskTotal ) * 100 );
 	$statsPreview['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
 }
 
-// Extended stats (shown when expanded) - keep same order
+// Project Stats (expanded) - shown after preview when expanded
 if( $fileCount > 0 ){
-	$statsExtended['Files'] = number_format( $fileCount );
+	$statsProjectExpanded['Files'] = number_format( $fileCount );
 }
 if( $latestItem ){
-	$statsExtended['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
+	$statsProjectExpanded['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
 }
 
-// Total Disk
+// System Stats (expanded) - shown after project stats with separator
 if( $diskTotal !== false && $diskTotal > 0 ){
-	$statsExtended['Total disk'] = humanFileSize( $diskTotal );
+	$statsSystemExpanded['Total disk'] = humanFileSize( $diskTotal );
 }
 
-// Memory (extended)
+// Memory
 if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
 	$memInfo = @shell_exec( PHP_OS_FAMILY === 'Darwin' ? 'sysctl hw.memsize' : 'free -b | grep Mem' );
 	if( $memInfo ){
 		if( PHP_OS_FAMILY === 'Darwin' ){
 			if( preg_match( '/hw\.memsize:\s+(\d+)/', $memInfo, $matches ) ){
-				$statsExtended['Memory'] = humanFileSize( (int)$matches[1] );
+				$statsSystemExpanded['Memory'] = humanFileSize( (int)$matches[1] );
 			}
 		} else {
 			if( preg_match( '/Mem:\s+(\d+)/', $memInfo, $matches ) ){
-				$statsExtended['Memory'] = humanFileSize( (int)$matches[1] );
+				$statsSystemExpanded['Memory'] = humanFileSize( (int)$matches[1] );
 			}
 		}
 	}
 }
 
-// CPU Info (extended)
+// CPU Info
 if( PHP_OS_FAMILY === 'Darwin' ){
 	$cpuModel = @shell_exec( 'sysctl -n machdep.cpu.brand_string' );
 	$cpuCores = @shell_exec( 'sysctl -n hw.ncpu' );
 	if( $cpuModel && $cpuCores ){
 		$cpuModel = trim( $cpuModel );
 		$cpuCores = trim( $cpuCores );
-		$statsExtended['CPU'] = $cpuCores . ' cores';
+		$statsSystemExpanded['CPU'] = $cpuCores . ' cores';
 	}
 } elseif( PHP_OS_FAMILY === 'Linux' ){
 	$cpuInfo = @shell_exec( 'nproc' );
 	if( $cpuInfo ){
-		$statsExtended['CPU'] = trim( $cpuInfo ) . ' cores';
+		$statsSystemExpanded['CPU'] = trim( $cpuInfo ) . ' cores';
 	}
 }
 
-// Uptime (extended)
+// Uptime
 if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
 	$uptime = @shell_exec( 'uptime' );
 	if( $uptime && preg_match( '/up\s+(.+?),\s+\d+\s+user/', $uptime, $matches ) ){
-		$statsExtended['Uptime'] = trim( $matches[1] );
+		$statsSystemExpanded['Uptime'] = trim( $matches[1] );
 	}
 }
 
-// OS Version (preview - last item when folded)
+// OS Version (in preview - last item when folded)
 if( PHP_OS_FAMILY === 'Darwin' ){
 	$osVersion = @shell_exec( 'sw_vers -productVersion' );
 	if( $osVersion ){
@@ -819,11 +822,14 @@ if( PHP_OS_FAMILY === 'Darwin' ){
 
 		$versionName = $versionNames[$majorVersion] ?? 'macOS';
 		$statsPreview['OS'] = "macOS {$version} ({$versionName})";
+		$statsSystemExpanded['OS'] = "macOS {$version} ({$versionName})";
 	}
 } elseif( PHP_OS_FAMILY === 'Linux' ){
 	$osVersion = @shell_exec( "lsb_release -ds 2>/dev/null || cat /etc/*release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'" );
 	if( $osVersion ){
-		$statsPreview['OS'] = trim( explode( "\n", $osVersion )[0] );
+		$osValue = trim( explode( "\n", $osVersion )[0] );
+		$statsPreview['OS'] = $osValue;
+		$statsSystemExpanded['OS'] = $osValue;
 	}
 }
 
@@ -1073,7 +1079,7 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .theme {
-            margin-bottom: calc(var(--spacing-unit) * 3);
+            margin-bottom: calc(var(--spacing-unit) * 2);
             padding: var(--card-padding);
             background: var(--card-bg);
             border-radius: var(--card-radius);
@@ -1220,7 +1226,7 @@ foreach( $faviconCandidates as $candidate ){
         .actions,
         .recent,
         .tools {
-            margin-bottom: calc(var(--spacing-unit) * 3);
+            margin-bottom: calc(var(--spacing-unit) * 2);
             padding: var(--card-padding);
             background: var(--card-bg);
             border-radius: var(--card-radius);
@@ -1772,16 +1778,28 @@ foreach( $faviconCandidates as $candidate ){
                         </div>
 					<?php endforeach; ?>
                 </div>
-				<?php if( !empty( $statsExtended ) ): ?>
-                <div id="stats-extended" class="extended-section" style="display: none;">
-                    <div class="table">
-						<?php foreach( $statsExtended as $label => $value ): ?>
-                            <div>
-                                <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
-                                <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
-                            </div>
-						<?php endforeach; ?>
-                    </div>
+				<?php if( !empty( $statsProjectExpanded ) || !empty( $statsSystemExpanded ) ): ?>
+                <div id="stats-extended" style="display: none;">
+					<?php if( !empty( $statsProjectExpanded ) ): ?>
+                        <div class="table" style="margin-top: calc(var(--spacing-unit) * 2);">
+							<?php foreach( $statsProjectExpanded as $label => $value ): ?>
+                                <div>
+                                    <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                    <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                </div>
+							<?php endforeach; ?>
+                        </div>
+					<?php endif; ?>
+					<?php if( !empty( $statsSystemExpanded ) ): ?>
+                        <div class="table" style="margin-top: calc(var(--spacing-unit) * 2); padding-top: calc(var(--spacing-unit) * 2); border-top: 1px solid rgba(255, 255, 255, 0.1);">
+							<?php foreach( $statsSystemExpanded as $label => $value ): ?>
+                                <div>
+                                    <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                    <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                </div>
+							<?php endforeach; ?>
+                        </div>
+					<?php endif; ?>
                 </div>
 				<?php endif; ?>
             </div>
@@ -1799,7 +1817,7 @@ foreach( $faviconCandidates as $candidate ){
                         <span>🔄</span> Restart Apache
                     </button>
                 </div>
-                <div id="actions-extended" class="extended-section" style="display: none;">
+                <div id="actions-extended" style="display: none; margin-top: calc(var(--spacing-unit) * 2);">
                     <div class="action-buttons">
                         <button class="action-btn" data-action="restart-mysql" title="Restart MySQL database">
                             <span>🔄</span> Restart MySQL
@@ -1827,7 +1845,7 @@ foreach( $faviconCandidates as $candidate ){
 					<?php endforeach; ?>
                 </ul>
 				<?php if( !empty( $recentExtended ) ): ?>
-                <div id="recent-extended" class="extended-section" style="display: none;">
+                <div id="recent-extended" style="display: none; margin-top: calc(var(--spacing-unit) * 2);">
                     <ul>
 						<?php foreach( $recentExtended as $item ): ?>
                             <li class="<?= htmlspecialchars( $item['type'], ENT_QUOTES, 'UTF-8' ); ?>">
