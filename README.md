@@ -2,7 +2,7 @@
 
 A beautiful, self-contained localhost homepage for local development environments. Display all your projects, server info, and quick links in one elegant interface.
 
-![Version](https://img.shields.io/badge/version-1.5.1-blue)
+![Version](https://img.shields.io/badge/version-1.5.2-blue)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![GitHub stars](https://img.shields.io/github/stars/pier0074/LocalhostIndex?style=social)
