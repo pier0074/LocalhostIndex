@@ -366,10 +366,10 @@ if( isset( $_POST['action'] ) ){
 
 		case 'mysql-status':
 			if( PHP_OS_FAMILY === 'Darwin' ){
-				$status = @shell_exec( 'brew services list | grep mysql 2>&1' );
+				$status = (string) @shell_exec( 'brew services list | grep mysql 2>&1' );
 				$isRunning = strpos( $status, 'started' ) !== false;
 			} else {
-				$status = @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
+				$status = (string) @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
 				$isRunning = trim( $status ) === 'active';
 			}
 			$result = [ 'success' => true, 'running' => $isRunning ];
@@ -377,7 +377,7 @@ if( isset( $_POST['action'] ) ){
 
 		case 'toggle-mysql':
 			if( PHP_OS_FAMILY === 'Darwin' ){
-				$status = @shell_exec( 'brew services list | grep mysql' );
+				$status = (string) @shell_exec( 'brew services list | grep mysql 2>&1' );
 				if( strpos( $status, 'started' ) !== false ){
 					$output = @shell_exec( 'brew services stop mysql 2>&1' );
 					$result = [ 'success' => true, 'message' => 'MySQL stopped', 'output' => $output ];
@@ -386,7 +386,7 @@ if( isset( $_POST['action'] ) ){
 					$result = [ 'success' => true, 'message' => 'MySQL started', 'output' => $output ];
 				}
 			} else {
-				$output = @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
+				$output = (string) @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
 				if( trim( $output ) === 'active' ){
 					$output = @shell_exec( 'sudo systemctl stop mysql 2>&1' );
 					$result = [ 'success' => true, 'message' => 'MySQL stopped', 'output' => $output ];
@@ -421,15 +421,21 @@ if( isset( $_POST['action'] ) ){
 				$status[] = 'Apache: ' . apache_get_version();
 			}
 			$status[] = 'PHP: ' . phpversion();
-			if( function_exists( 'mysqli_connect' ) ){
+
+			// Try MySQL connection (PHP 8.1+ throws exceptions)
+			try {
+				mysqli_report( MYSQLI_REPORT_OFF );
 				$mysqli = @new mysqli( 'localhost', 'root', '' );
-				if( !$mysqli->connect_error ){
+				if( $mysqli->connect_error ){
+					$status[] = 'MySQL: Not connected';
+				} else {
 					$status[] = 'MySQL: Connected (' . $mysqli->server_info . ')';
 					$mysqli->close();
-				} else {
-					$status[] = 'MySQL: Not connected';
 				}
+			} catch( Exception $e ){
+				$status[] = 'MySQL: Not connected';
 			}
+
 			$result = [ 'success' => true, 'message' => 'Server Status', 'output' => implode( "\n", $status ) ];
 			break;
 
