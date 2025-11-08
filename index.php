@@ -449,21 +449,19 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 		);
 	}
 
+	// Most common MySQL paths (ordered by likelihood on macOS/Linux)
 	$default_binaries = [
-		'mysql',
-		'mysqld',
+		'/usr/local/mysql/bin/mysql',
+		'/opt/homebrew/bin/mysql',
 		'/usr/local/bin/mysql',
 		'/usr/bin/mysql',
-		'/opt/homebrew/bin/mysql',
-		'/usr/local/mysql/bin/mysql',
 		'/opt/local/bin/mysql',
+		'mysql',
 		'/usr/local/mysql/bin/mysqld',
 		'/usr/sbin/mysqld',
-		'/usr/libexec/mysqld'
+		'/usr/libexec/mysqld',
+		'mysqld'
 	];
-
-	// Skip slow shell probes - just use default binaries and user-provided paths
-	// This improves page load performance significantly
 
 	$binary_candidates = array_values(
 		array_unique(
@@ -475,8 +473,8 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 	);
 
 	if( $shell_available ){
-		// Limit to first 3 candidates for performance (reduce shell_exec calls)
-		foreach( array_slice( $binary_candidates, 0, 3 ) as $binary ){
+		// Try first 5 candidates for better detection while keeping good performance
+		foreach( array_slice( $binary_candidates, 0, 5 ) as $binary ){
 			$binary = trim( (string) $binary );
 			if( $binary === '' ){
 				continue;
@@ -652,6 +650,44 @@ function formatRelativeTime( $timestamp ) {
 }
 
 /**
+ * Calculate directory size recursively (with depth limit for performance)
+ */
+function getDirectorySize( $path, $maxDepth = 3, $currentDepth = 0 ) {
+	$size = 0;
+
+	// Stop if we've gone too deep (prevent performance issues)
+	if( $currentDepth >= $maxDepth ){
+		return $size;
+	}
+
+	if( !is_dir( $path ) || !is_readable( $path ) ){
+		return $size;
+	}
+
+	$handle = @opendir( $path );
+	if( !$handle ){
+		return $size;
+	}
+
+	while( ( $item = readdir( $handle ) ) !== false ){
+		if( $item === '.' || $item === '..' ){
+			continue;
+		}
+
+		$itemPath = $path . '/' . $item;
+
+		if( is_file( $itemPath ) ){
+			$size += filesize( $itemPath );
+		} elseif( is_dir( $itemPath ) ){
+			$size += getDirectorySize( $itemPath, $maxDepth, $currentDepth + 1 );
+		}
+	}
+
+	closedir( $handle );
+	return $size;
+}
+
+/**
  * Get cached directory listing or scan directory
  */
 function getDirectoryListing( $options ) {
@@ -690,11 +726,14 @@ function getDirectoryListing( $options ) {
 			$isDir = is_dir( $path );
 			$itemType = $isDir ? 'dir' : 'file';
 
+			// Calculate size (for directories, calculate recursively with depth limit)
+			$size = $isDir ? getDirectorySize( $path ) : filesize( $path );
+
 			$itemData = [
 				'name' => $item,
 				'type' => $itemType,
 				'mtime' => filemtime( $path ),
-				'size' => $isDir ? 0 : filesize( $path ),
+				'size' => $size,
 			];
 
 			$directoryList[] = $itemData;
