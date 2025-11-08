@@ -1240,11 +1240,22 @@ foreach( $faviconCandidates as $candidate ){
             color: var(--color-secondary);
             margin-right: 16px;
             word-break: break-word;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .recent ul li .name:hover {
+            color: var(--color-accent);
+            text-decoration: underline;
         }
 
         .recent ul li.dir .name {
             color: var(--color-accent);
             font-weight: bold;
+        }
+
+        .recent ul li.dir .name:hover {
+            opacity: 0.8;
         }
 
         .recent ul li small {
@@ -1530,7 +1541,9 @@ foreach( $faviconCandidates as $candidate ){
                 <ul>
 					<?php foreach( $recentItems as $item ): ?>
                         <li class="<?= htmlspecialchars( $item['type'], ENT_QUOTES, 'UTF-8' ); ?>">
-                            <span class="name"><?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?></span>
+                            <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>" class="name">
+								<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
+                            </a>
                             <small title="<?= htmlspecialchars( $item['absolute'], ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $item['relative'], ENT_QUOTES, 'UTF-8' ); ?></small>
                         </li>
 					<?php endforeach; ?>
