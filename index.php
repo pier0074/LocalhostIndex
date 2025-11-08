@@ -10,7 +10,8 @@
 // Configuration constants
 define( 'CSRF_TOKEN_LENGTH', 32 );        // Length of CSRF token in bytes
 define( 'MYSQL_TIMEOUT', 2 );             // MySQL connection timeout in seconds
-define( 'RECENT_ITEMS_LIMIT', 5 );        // Number of recent items to display
+define( 'RECENT_ITEMS_LIMIT', 10 );       // Number of recent items to display (extended)
+define( 'RECENT_ITEMS_PREVIEW', 2 );      // Number of recent items in preview (folded)
 define( 'CACHE_TTL', 60 );                // Cache time-to-live in seconds
 
 $options = [
@@ -729,21 +730,101 @@ foreach( $directoryList as $item ){
 	}
 }
 
-$stats = [];
+// Stats: Preview (folded) and Extended (expanded)
+$statsPreview = [];
+$statsExtended = [];
+
+// Preview stats (always visible when folded)
 if( $projectCount > 0 ){
-	$stats['Projects'] = number_format( $projectCount );
+	$statsPreview['Projects'] = number_format( $projectCount );
 }
-if( $fileCount > 0 ){
-	$stats['Files'] = number_format( $fileCount );
-}
-if( $latestItem ){
-	$stats['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
-}
+
 $diskTotal = disk_total_space( __DIR__ );
 $diskFree = disk_free_space( __DIR__ );
 if( $diskTotal !== false && $diskTotal > 0 && $diskFree !== false ){
 	$freePercent = round( ( $diskFree / $diskTotal ) * 100 );
-	$stats['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
+	$statsPreview['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
+}
+
+// Extended stats (shown when expanded) - keep same order
+if( $fileCount > 0 ){
+	$statsExtended['Files'] = number_format( $fileCount );
+}
+if( $latestItem ){
+	$statsExtended['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
+}
+
+// Total Disk
+if( $diskTotal !== false && $diskTotal > 0 ){
+	$statsExtended['Total disk'] = humanFileSize( $diskTotal );
+}
+
+// Memory (extended)
+if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
+	$memInfo = @shell_exec( PHP_OS_FAMILY === 'Darwin' ? 'sysctl hw.memsize' : 'free -b | grep Mem' );
+	if( $memInfo ){
+		if( PHP_OS_FAMILY === 'Darwin' ){
+			if( preg_match( '/hw\.memsize:\s+(\d+)/', $memInfo, $matches ) ){
+				$statsExtended['Memory'] = humanFileSize( (int)$matches[1] );
+			}
+		} else {
+			if( preg_match( '/Mem:\s+(\d+)/', $memInfo, $matches ) ){
+				$statsExtended['Memory'] = humanFileSize( (int)$matches[1] );
+			}
+		}
+	}
+}
+
+// CPU Info (extended)
+if( PHP_OS_FAMILY === 'Darwin' ){
+	$cpuModel = @shell_exec( 'sysctl -n machdep.cpu.brand_string' );
+	$cpuCores = @shell_exec( 'sysctl -n hw.ncpu' );
+	if( $cpuModel && $cpuCores ){
+		$cpuModel = trim( $cpuModel );
+		$cpuCores = trim( $cpuCores );
+		$statsExtended['CPU'] = $cpuCores . ' cores';
+	}
+} elseif( PHP_OS_FAMILY === 'Linux' ){
+	$cpuInfo = @shell_exec( 'nproc' );
+	if( $cpuInfo ){
+		$statsExtended['CPU'] = trim( $cpuInfo ) . ' cores';
+	}
+}
+
+// Uptime (extended)
+if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
+	$uptime = @shell_exec( 'uptime' );
+	if( $uptime && preg_match( '/up\s+(.+?),\s+\d+\s+user/', $uptime, $matches ) ){
+		$statsExtended['Uptime'] = trim( $matches[1] );
+	}
+}
+
+// OS Version (preview - last item when folded)
+if( PHP_OS_FAMILY === 'Darwin' ){
+	$osVersion = @shell_exec( 'sw_vers -productVersion' );
+	if( $osVersion ){
+		$version = trim( $osVersion );
+		$versionParts = explode( '.', $version );
+		$majorVersion = (int)$versionParts[0];
+
+		// macOS version names
+		$versionNames = [
+			15 => 'Sequoia',
+			14 => 'Sonoma',
+			13 => 'Ventura',
+			12 => 'Monterey',
+			11 => 'Big Sur',
+			10 => 'Catalina/Mojave/High Sierra'
+		];
+
+		$versionName = $versionNames[$majorVersion] ?? 'macOS';
+		$statsPreview['OS'] = "macOS {$version} ({$versionName})";
+	}
+} elseif( PHP_OS_FAMILY === 'Linux' ){
+	$osVersion = @shell_exec( "lsb_release -ds 2>/dev/null || cat /etc/*release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'" );
+	if( $osVersion ){
+		$statsPreview['OS'] = trim( explode( "\n", $osVersion )[0] );
+	}
 }
 
 usort( $recentItems, static fn( $a, $b ) => $b['mtime'] <=> $a['mtime'] );
@@ -761,6 +842,10 @@ $recentItems = array_map(
 	},
 	$recentItems
 );
+
+// Split recent items into preview and extended
+$recentPreview = array_slice( $recentItems, 0, RECENT_ITEMS_PREVIEW );
+$recentExtended = array_slice( $recentItems, RECENT_ITEMS_PREVIEW );
 
 $themes = [
 	'light' => [
@@ -1131,7 +1216,10 @@ foreach( $faviconCandidates as $candidate ){
 
 
         .info,
-        .stats {
+        .stats,
+        .actions,
+        .recent,
+        .tools {
             margin-bottom: calc(var(--spacing-unit) * 3);
             padding: var(--card-padding);
             background: var(--card-bg);
@@ -1139,8 +1227,50 @@ foreach( $faviconCandidates as $candidate ){
             box-shadow: var(--card-shadow);
         }
 
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: calc(var(--spacing-unit) * 2);
+        }
+
+        .section-header h2 {
+            margin-bottom: 0;
+        }
+
+        .toggle-btn {
+            background: var(--input-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            color: var(--color-accent);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .toggle-btn:hover {
+            background: var(--input-focus-bg);
+            border-color: var(--color-accent);
+            transform: scale(1.1);
+        }
+
+        .extended-section {
+            margin-top: calc(var(--spacing-unit) * 2);
+            padding-top: calc(var(--spacing-unit) * 2);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
         .info .table > div,
-        .stats .table > div {
+        .stats .table > div,
+        .system-stats .table > div {
             margin: 7px 0;
             color: var(--color-muted);
             display: flex;
@@ -1154,7 +1284,8 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .info .table > div > span:first-child,
-        .stats .table > div > span:first-child {
+        .stats .table > div > span:first-child,
+        .system-stats .table > div > span:first-child {
             flex: 1;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -1163,7 +1294,8 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         .info .table > div > span:last-child,
-        .stats .table > div > span:last-child {
+        .stats .table > div > span:last-child,
+        .system-stats .table > div > span:last-child {
             flex-shrink: 0;
             font-weight: bold;
             padding: 0 3px;
@@ -1174,6 +1306,52 @@ foreach( $faviconCandidates as $candidate ){
         .stats .table > div > span:last-child {
             color: var(--color-secondary);
             font-weight: 600;
+        }
+
+        .system-stats .table > div > span:last-child {
+            color: var(--color-accent);
+            font-weight: 600;
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: var(--input-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: var(--color-text);
+            padding: 10px 12px;
+            font-family: monospace;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .action-btn span {
+            font-size: 14px;
+        }
+
+        .action-btn:hover {
+            background: var(--input-focus-bg);
+            border-color: var(--color-accent);
+            transform: translateY(-1px);
+        }
+
+        .action-btn:active {
+            transform: translateY(0);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .expand-btn {
@@ -1212,9 +1390,8 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         #extended-info .table {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 0;
+            padding-top: 0;
         }
 
         #extended-info .table > div {
@@ -1240,14 +1417,6 @@ foreach( $faviconCandidates as $candidate ){
             padding: 0 3px;
             border-radius: 3px;
             text-align: right;
-        }
-
-        .recent {
-            margin-bottom: calc(var(--spacing-unit) * 3);
-            padding: var(--card-padding);
-            background: var(--card-bg);
-            border-radius: var(--card-radius);
-            box-shadow: var(--card-shadow);
         }
 
         .recent ul {
@@ -1409,13 +1578,6 @@ foreach( $faviconCandidates as $candidate ){
             outline: none;
         }
 
-        .tools {
-            padding: var(--card-padding);
-            background: var(--card-bg);
-            border-radius: var(--card-radius);
-            box-shadow: var(--card-shadow);
-        }
-
         .tools ul {
             list-style-type: none;
             padding: 0;
@@ -1563,7 +1725,10 @@ foreach( $faviconCandidates as $candidate ){
             </div>
         </div>
         <div class="info">
-            <h2>info</h2>
+            <div class="section-header">
+                <h2>info</h2>
+                <button class="toggle-btn" data-target="info-extended" data-ajax="runtimes" aria-label="Expand runtimes">+</button>
+            </div>
             <div class="table" id="basic-info">
 				<?php foreach( $info as $label => $value ): ?>
                     <div class="<?= $label ?>">
@@ -1572,14 +1737,9 @@ foreach( $faviconCandidates as $candidate ){
                     </div>
 				<?php endforeach; ?>
             </div>
-            <div id="extended-info" style="display: none;"></div>
-            <button id="expand-runtimes" class="expand-btn" aria-label="Show more runtimes">
-                <span class="expand-text">+ more runtimes</span>
-                <span class="loading-text" style="display: none;">loading...</span>
-            </button>
-            <button id="collapse-runtimes" class="expand-btn collapse-btn" style="display: none;" aria-label="Hide runtimes">
-                - hide
-            </button>
+            <div id="info-extended" class="extended-section" style="display: none;">
+                <div id="extended-info"></div>
+            </div>
         </div>
 		<?php if( !empty( $options['extras'] ) ): ?>
             <div class="tools">
@@ -1598,24 +1758,66 @@ foreach( $faviconCandidates as $candidate ){
                 </ul>
             </div>
 		<?php endif; ?>
-		<?php if( !empty( $stats ) ): ?>
+		<?php if( !empty( $statsPreview ) ): ?>
             <div class="stats">
-                <h2>stats</h2>
+                <div class="section-header">
+                    <h2>stats</h2>
+                    <button class="toggle-btn" data-target="stats-extended" aria-label="Expand stats">+</button>
+                </div>
                 <div class="table">
-					<?php foreach( $stats as $label => $value ): ?>
+					<?php foreach( $statsPreview as $label => $value ): ?>
                         <div>
                             <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
                             <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
                         </div>
 					<?php endforeach; ?>
                 </div>
+				<?php if( !empty( $statsExtended ) ): ?>
+                <div id="stats-extended" class="extended-section" style="display: none;">
+                    <div class="table">
+						<?php foreach( $statsExtended as $label => $value ): ?>
+                            <div>
+                                <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
+                            </div>
+						<?php endforeach; ?>
+                    </div>
+                </div>
+				<?php endif; ?>
             </div>
 		<?php endif; ?>
-		<?php if( !empty( $recentItems ) ): ?>
+            <div class="actions">
+                <div class="section-header">
+                    <h2>actions</h2>
+                    <button class="toggle-btn" data-target="actions-extended" aria-label="Expand actions">+</button>
+                </div>
+                <div class="action-buttons">
+                    <button class="action-btn" data-action="clear-cache" title="Clear PHP opcache">
+                        <span>🗑️</span> Clear Cache
+                    </button>
+                    <button class="action-btn" data-action="restart-apache" title="Restart Apache web server">
+                        <span>🔄</span> Restart Apache
+                    </button>
+                </div>
+                <div id="actions-extended" class="extended-section" style="display: none;">
+                    <div class="action-buttons">
+                        <button class="action-btn" data-action="restart-mysql" title="Restart MySQL database">
+                            <span>🔄</span> Restart MySQL
+                        </button>
+                        <button class="action-btn" data-action="view-logs" title="View Apache error log">
+                            <span>📋</span> View Logs
+                        </button>
+                    </div>
+                </div>
+            </div>
+		<?php if( !empty( $recentPreview ) ): ?>
             <div class="recent">
-                <h2>recent</h2>
+                <div class="section-header">
+                    <h2>recent</h2>
+                    <button class="toggle-btn" data-target="recent-extended" aria-label="Expand recent">+</button>
+                </div>
                 <ul>
-					<?php foreach( $recentItems as $item ): ?>
+					<?php foreach( $recentPreview as $item ): ?>
                         <li class="<?= htmlspecialchars( $item['type'], ENT_QUOTES, 'UTF-8' ); ?>">
                             <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>" class="name">
 								<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
@@ -1624,6 +1826,20 @@ foreach( $faviconCandidates as $candidate ){
                         </li>
 					<?php endforeach; ?>
                 </ul>
+				<?php if( !empty( $recentExtended ) ): ?>
+                <div id="recent-extended" class="extended-section" style="display: none;">
+                    <ul>
+						<?php foreach( $recentExtended as $item ): ?>
+                            <li class="<?= htmlspecialchars( $item['type'], ENT_QUOTES, 'UTF-8' ); ?>">
+                                <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>" class="name">
+									<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
+                                </a>
+                                <small title="<?= htmlspecialchars( $item['absolute'], ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $item['relative'], ENT_QUOTES, 'UTF-8' ); ?></small>
+                            </li>
+						<?php endforeach; ?>
+                    </ul>
+                </div>
+				<?php endif; ?>
             </div>
 		<?php endif; ?>
     </aside>
@@ -1757,87 +1973,64 @@ foreach( $faviconCandidates as $candidate ){
         });
     });
 
-    // Expand runtimes button
-    const expandBtn = document.getElementById('expand-runtimes');
-    const extendedInfo = document.getElementById('extended-info');
-    const collapseBtn = document.getElementById('collapse-runtimes');
+    // Toggle buttons for stats, actions, and info
     let runtimesLoaded = false;
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const target = document.getElementById(targetId);
+            const ajax = this.getAttribute('data-ajax');
 
-    if (expandBtn) {
-        expandBtn.addEventListener('click', () => {
-            // If data already loaded, just show it
-            if (runtimesLoaded) {
-                extendedInfo.style.display = 'block';
-                expandBtn.classList.add('expanded');
-                if (collapseBtn) {
-                    collapseBtn.style.display = 'block';
-                }
-                return;
-            }
+            if (target) {
+                if (target.style.display === 'none') {
+                    // Expanding
+                    target.style.display = 'block';
+                    this.textContent = '−';
+                    this.setAttribute('aria-label', 'Collapse section');
 
-            // Show loading state
-            expandBtn.classList.add('loading');
-            expandBtn.querySelector('.expand-text').style.display = 'none';
-            expandBtn.querySelector('.loading-text').style.display = 'inline';
+                    // Load runtimes via AJAX if needed
+                    if (ajax === 'runtimes' && !runtimesLoaded) {
+                        const extendedInfo = document.getElementById('extended-info');
+                        if (extendedInfo) {
+                            extendedInfo.innerHTML = '<div style="text-align:center;padding:10px;color:var(--color-muted);">loading...</div>';
 
-            // Build URL with CSRF token if needed
-            const url = new URL(window.location.href);
-            url.searchParams.set('action', 'detect_runtimes');
+                            const url = new URL(window.location.href);
+                            url.searchParams.set('action', 'detect_runtimes');
 <?php if( !empty( $options['security']['enable_csrf'] ) ): ?>
-            url.searchParams.set('token', '<?= $_SESSION['csrf_token'] ?>');
+                            url.searchParams.set('token', '<?= $_SESSION['csrf_token'] ?>');
 <?php endif; ?>
 
-            // Fetch extended runtimes
-            fetch(url.toString())
-                .then(response => response.json())
-                .then(data => {
-                    // Remove basic info that's already displayed
-                    const basicKeys = ['Apache', 'PHP', 'MySQL'];
-                    const extended = Object.entries(data).filter(([key]) => !basicKeys.includes(key));
+                            fetch(url.toString())
+                                .then(response => response.json())
+                                .then(data => {
+                                    const basicKeys = ['Apache', 'PHP', 'MySQL'];
+                                    const extended = Object.entries(data)
+                                        .filter(([key]) => !basicKeys.includes(key))
+                                        .map(([label, value]) => {
+                                            const escapedLabel = label.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                            const escapedValue = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                            return `<div><span>${escapedLabel}</span><span>${escapedValue}</span></div>`;
+                                        })
+                                        .join('');
 
-                    if (extended.length > 0) {
-                        // Build HTML for extended runtimes
-                        const html = '<div class="table">' +
-                            extended.map(([label, value]) =>
-                                `<div class="${label}">` +
-                                `<span>${label}</span>` +
-                                `<span>${value}</span>` +
-                                `</div>`
-                            ).join('') +
-                            '</div>';
-
-                        extendedInfo.innerHTML = html;
-                        extendedInfo.style.display = 'block';
+                                    extendedInfo.innerHTML = extended ? `<div class="table">${extended}</div>` : '<div style="text-align:center;padding:10px;color:var(--color-muted);">No additional runtimes detected</div>';
+                                    runtimesLoaded = true;
+                                })
+                                .catch(error => {
+                                    console.error('Failed to load runtimes:', error);
+                                    extendedInfo.innerHTML = '<div style="text-align:center;padding:10px;color:var(--color-muted);">⚠ Failed to load</div>';
+                                });
+                        }
                     }
-
-                    // Hide expand button, show collapse button
-                    expandBtn.classList.remove('loading');
-                    expandBtn.querySelector('.expand-text').style.display = 'inline';
-                    expandBtn.querySelector('.loading-text').style.display = 'none';
-                    expandBtn.classList.add('expanded');
-                    if (collapseBtn) {
-                        collapseBtn.style.display = 'block';
-                    }
-                    runtimesLoaded = true;
-                })
-                .catch(error => {
-                    console.error('Failed to load runtimes:', error);
-                    expandBtn.classList.remove('loading');
-                    expandBtn.querySelector('.expand-text').style.display = 'inline';
-                    expandBtn.querySelector('.expand-text').textContent = '⚠ failed to load';
-                    expandBtn.querySelector('.loading-text').style.display = 'none';
-                });
+                } else {
+                    // Collapsing
+                    target.style.display = 'none';
+                    this.textContent = '+';
+                    this.setAttribute('aria-label', 'Expand section');
+                }
+            }
         });
-    }
-
-    // Collapse runtimes button
-    if (collapseBtn) {
-        collapseBtn.addEventListener('click', () => {
-            extendedInfo.style.display = 'none';
-            collapseBtn.style.display = 'none';
-            expandBtn.classList.remove('expanded');
-        });
-    }
+    });
 </script>
 </body>
 </html>
