@@ -362,6 +362,17 @@ if( isset( $_POST['action'] ) ){
 			$result = [ 'success' => true, 'message' => 'Browser cache cleared! (Press Cmd+Shift+R or Ctrl+Shift+R to hard reload)' ];
 			break;
 
+		case 'mysql-status':
+			if( PHP_OS_FAMILY === 'Darwin' ){
+				$status = @shell_exec( 'brew services list | grep mysql 2>&1' );
+				$isRunning = strpos( $status, 'started' ) !== false;
+			} else {
+				$status = @shell_exec( 'sudo systemctl is-active mysql 2>&1' );
+				$isRunning = trim( $status ) === 'active';
+			}
+			$result = [ 'success' => true, 'running' => $isRunning ];
+			break;
+
 		case 'toggle-mysql':
 			if( PHP_OS_FAMILY === 'Darwin' ){
 				$status = @shell_exec( 'brew services list | grep mysql' );
@@ -2261,7 +2272,7 @@ foreach( $faviconCandidates as $candidate ){
 
     searchInput.focus();
     searchInput.addEventListener('keyup', (e) => {
-        let val = searchInput.value.trim();
+        let val = searchInput.value.trim().toLowerCase();
 
         projectContent.querySelectorAll('li').forEach((el) => {
             // jump to the first displayed dir/file on enter
@@ -2274,7 +2285,7 @@ foreach( $faviconCandidates as $candidate ){
 
             if (val == '') {
                 el.classList.remove('hidden');
-            } else if (el.innerText.indexOf(val) <= -1) {
+            } else if (el.innerText.toLowerCase().indexOf(val) <= -1) {
                 el.classList.add('hidden');
             }
         });
@@ -2362,6 +2373,14 @@ foreach( $faviconCandidates as $candidate ){
                             preview.style.display = 'block';
                         }
                     }
+
+                    // Hide action output when collapsing actions section
+                    if (targetId === 'actions-extended') {
+                        const actionOutput = document.getElementById('action-output');
+                        if (actionOutput) {
+                            actionOutput.style.display = 'none';
+                        }
+                    }
                 }
             }
         });
@@ -2382,6 +2401,7 @@ foreach( $faviconCandidates as $candidate ){
             this.disabled = true;
             const originalText = this.innerHTML;
             this.innerHTML = '<span>⏳</span> Processing...';
+            const isMySQLAction = action === 'toggle-mysql';
 
             // Prepare form data
             const formData = new FormData();
@@ -2399,17 +2419,23 @@ foreach( $faviconCandidates as $candidate ){
             .then(data => {
                 // Re-enable button
                 this.disabled = false;
-                this.innerHTML = originalText;
+
+                // Update MySQL button status after toggle, otherwise restore original text
+                if (isMySQLAction) {
+                    updateMySQLButton();
+                } else {
+                    this.innerHTML = originalText;
+                }
 
                 // Show modal with result
                 if (actionModal && actionOutput) {
-                    let output = `<strong>${data.success ? '✅' : '❌'} ${data.message}</strong>`;
+                    let output = `<strong>${data.success ? '✅' : '❌'} ${escapeHtml(data.message)}</strong>`;
 
                     if (data.output) {
                         output += `\n\n${escapeHtml(data.output)}`;
                     }
 
-                    actionOutput.textContent = output;
+                    actionOutput.innerHTML = output;
                     actionModal.style.display = 'block';
                 }
             })
@@ -2420,7 +2446,7 @@ foreach( $faviconCandidates as $candidate ){
 
                 // Show error in modal
                 if (actionModal && actionOutput) {
-                    actionOutput.textContent = `❌ Error: ${error.message}`;
+                    actionOutput.innerHTML = `<strong>❌ Error: ${escapeHtml(error.message)}</strong>`;
                     actionModal.style.display = 'block';
                 }
             });
@@ -2436,6 +2462,42 @@ foreach( $faviconCandidates as $candidate ){
         });
     }
 
+    // Update MySQL button text based on server status
+    function updateMySQLButton() {
+        const mysqlButtons = document.querySelectorAll('[data-action="toggle-mysql"]');
+        if (mysqlButtons.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('action', 'mysql-status');
+<?php if( !empty( $options['security']['enable_csrf'] ) ): ?>
+        formData.append('token', '<?= $_SESSION['csrf_token'] ?>');
+<?php endif; ?>
+
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mysqlButtons.forEach(btn => {
+                    if (data.running) {
+                        btn.innerHTML = '<span>🛑</span> Stop MySQL';
+                        btn.title = 'Stop MySQL server';
+                    } else {
+                        btn.innerHTML = '<span>▶️</span> Start MySQL';
+                        btn.title = 'Start MySQL server';
+                    }
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Failed to check MySQL status:', error);
+        });
+    }
+
+    // Update MySQL button on page load
+    updateMySQLButton();
 
     // Helper function to escape HTML
     function escapeHtml(text) {
