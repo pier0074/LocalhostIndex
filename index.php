@@ -729,7 +729,10 @@ foreach( $directoryList as $item ){
 	}
 }
 
+// Combined Stats (Projects + System)
 $stats = [];
+
+// Project Stats (always visible)
 if( $projectCount > 0 ){
 	$stats['Projects'] = number_format( $projectCount );
 }
@@ -739,15 +742,15 @@ if( $fileCount > 0 ){
 if( $latestItem ){
 	$stats['Last update'] = formatRelativeTime( $latestMtime ) . ' · ' . $latestItem['name'];
 }
+
+// System Stats (expandable)
+$systemStats = [];
 $diskTotal = disk_total_space( __DIR__ );
 $diskFree = disk_free_space( __DIR__ );
 if( $diskTotal !== false && $diskTotal > 0 && $diskFree !== false ){
 	$freePercent = round( ( $diskFree / $diskTotal ) * 100 );
-	$stats['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
+	$systemStats['Disk free'] = humanFileSize( $diskFree ) . ' (' . $freePercent . '%)';
 }
-
-// System Stats
-$systemStats = [];
 
 // Total Disk
 if( $diskTotal !== false && $diskTotal > 0 ){
@@ -1193,13 +1196,55 @@ foreach( $faviconCandidates as $candidate ){
 
         .info,
         .stats,
-        .system-stats,
-        .actions {
+        .actions,
+        .recent,
+        .tools {
             margin-bottom: calc(var(--spacing-unit) * 3);
             padding: var(--card-padding);
             background: var(--card-bg);
             border-radius: var(--card-radius);
             box-shadow: var(--card-shadow);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: calc(var(--spacing-unit) * 2);
+        }
+
+        .section-header h2 {
+            margin-bottom: 0;
+        }
+
+        .toggle-btn {
+            background: var(--input-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            color: var(--color-accent);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .toggle-btn:hover {
+            background: var(--input-focus-bg);
+            border-color: var(--color-accent);
+            transform: scale(1.1);
+        }
+
+        .extended-section {
+            margin-top: calc(var(--spacing-unit) * 2);
+            padding-top: calc(var(--spacing-unit) * 2);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .info .table > div,
@@ -1352,14 +1397,6 @@ foreach( $faviconCandidates as $candidate ){
             padding: 0 3px;
             border-radius: 3px;
             text-align: right;
-        }
-
-        .recent {
-            margin-bottom: calc(var(--spacing-unit) * 3);
-            padding: var(--card-padding);
-            background: var(--card-bg);
-            border-radius: var(--card-radius);
-            box-shadow: var(--card-shadow);
         }
 
         .recent ul {
@@ -1519,13 +1556,6 @@ foreach( $faviconCandidates as $candidate ){
             background-color: var(--color-secondary);
             color: var(--color-bkg);
             outline: none;
-        }
-
-        .tools {
-            padding: var(--card-padding);
-            background: var(--card-bg);
-            border-radius: var(--card-radius);
-            box-shadow: var(--card-shadow);
         }
 
         .tools ul {
@@ -1712,7 +1742,10 @@ foreach( $faviconCandidates as $candidate ){
 		<?php endif; ?>
 		<?php if( !empty( $stats ) ): ?>
             <div class="stats">
-                <h2>stats</h2>
+                <div class="section-header">
+                    <h2>stats</h2>
+                    <button class="toggle-btn" data-target="stats-extended" aria-label="Expand stats">+</button>
+                </div>
                 <div class="table">
 					<?php foreach( $stats as $label => $value ): ?>
                         <div>
@@ -1721,36 +1754,40 @@ foreach( $faviconCandidates as $candidate ){
                         </div>
 					<?php endforeach; ?>
                 </div>
-            </div>
-		<?php endif; ?>
-		<?php if( !empty( $systemStats ) ): ?>
-            <div class="system-stats">
-                <h2>system</h2>
-                <div class="table">
-					<?php foreach( $systemStats as $label => $value ): ?>
-                        <div>
-                            <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
-                            <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
-                        </div>
-					<?php endforeach; ?>
+				<?php if( !empty( $systemStats ) ): ?>
+                <div id="stats-extended" class="extended-section" style="display: none;">
+                    <div class="table">
+						<?php foreach( $systemStats as $label => $value ): ?>
+                            <div>
+                                <span><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></span>
+                                <span><?= htmlspecialchars( $value, ENT_QUOTES, 'UTF-8' ); ?></span>
+                            </div>
+						<?php endforeach; ?>
+                    </div>
                 </div>
+				<?php endif; ?>
             </div>
 		<?php endif; ?>
             <div class="actions">
-                <h2>actions</h2>
-                <div class="action-buttons">
-                    <button class="action-btn" data-action="restart-apache" title="Restart Apache">
-                        <span>🔄</span> Apache
-                    </button>
-                    <button class="action-btn" data-action="restart-mysql" title="Restart MySQL">
-                        <span>🔄</span> MySQL
-                    </button>
-                    <button class="action-btn" data-action="clear-cache" title="Clear PHP Cache">
-                        <span>🗑️</span> Cache
-                    </button>
-                    <button class="action-btn" data-action="view-logs" title="View Error Log">
-                        <span>📋</span> Logs
-                    </button>
+                <div class="section-header">
+                    <h2>actions</h2>
+                    <button class="toggle-btn" data-target="actions-extended" aria-label="Expand actions">+</button>
+                </div>
+                <div id="actions-extended" class="extended-section" style="display: none;">
+                    <div class="action-buttons">
+                        <button class="action-btn" data-action="restart-apache" title="Restart Apache web server">
+                            <span>🔄</span> Restart Apache
+                        </button>
+                        <button class="action-btn" data-action="restart-mysql" title="Restart MySQL database">
+                            <span>🔄</span> Restart MySQL
+                        </button>
+                        <button class="action-btn" data-action="clear-cache" title="Clear PHP opcache">
+                            <span>🗑️</span> Clear Cache
+                        </button>
+                        <button class="action-btn" data-action="view-logs" title="View Apache error log">
+                            <span>📋</span> View Logs
+                        </button>
+                    </div>
                 </div>
             </div>
 		<?php if( !empty( $recentItems ) ): ?>
@@ -1980,6 +2017,26 @@ foreach( $faviconCandidates as $candidate ){
             expandBtn.classList.remove('expanded');
         });
     }
+
+    // Toggle buttons for stats and actions
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const target = document.getElementById(targetId);
+
+            if (target) {
+                if (target.style.display === 'none') {
+                    target.style.display = 'block';
+                    this.textContent = '−';
+                    this.setAttribute('aria-label', 'Collapse section');
+                } else {
+                    target.style.display = 'none';
+                    this.textContent = '+';
+                    this.setAttribute('aria-label', 'Expand section');
+                }
+            }
+        });
+    });
 </script>
 </body>
 </html>
