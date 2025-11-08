@@ -345,6 +345,9 @@ if( isset( $_GET['action'] ) && $_GET['action'] === 'detect_runtimes' ){
 
 // AJAX endpoint for quick actions
 if( isset( $_POST['action'] ) ){
+	// IMPORTANT: Set content type first, before any output
+	header( 'Content-Type: application/json' );
+
 	// Verify CSRF token if enabled
 	if( !empty( $options['security']['enable_csrf'] ) ){
 		if( !isset( $_POST['token'] ) || !hash_equals( $_SESSION['csrf_token'], $_POST['token'] ) ){
@@ -353,7 +356,6 @@ if( isset( $_POST['action'] ) ){
 		}
 	}
 
-	header( 'Content-Type: application/json' );
 	$action = $_POST['action'];
 	$result = [ 'success' => false, 'message' => 'Unknown action' ];
 
@@ -2451,8 +2453,10 @@ foreach( $faviconCandidates as $candidate ){
                 try {
                     return JSON.parse(text);
                 } catch (e) {
-                    console.error('Invalid JSON response:', text);
-                    throw new Error('Server returned invalid JSON');
+                    console.error('Failed to parse JSON. Error:', e);
+                    console.error('Server response (first 500 chars):', text.substring(0, 500));
+                    console.error('Response length:', text.length);
+                    throw new Error('Server returned invalid JSON. Check console for details.');
                 }
             })
             .then(data => {
