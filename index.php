@@ -955,7 +955,7 @@ foreach( $faviconCandidates as $candidate ){
             --card-bg: rgba(255, 255, 255, 0.02);
             --container-max-width: 1400px;
             --grid-gap: 32px;
-            --body-padding-top: 60px;
+            --body-padding-top: 24px;
             --body-padding-bottom: 24px;
             --body-padding-x: clamp(16px, 3vw, 32px);
         }
@@ -987,20 +987,19 @@ foreach( $faviconCandidates as $candidate ){
             letter-spacing: 3px;
         }
 
+        .theme {
+            margin-bottom: calc(var(--spacing-unit) * 3);
+            padding: var(--card-padding);
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+        }
+
         .theme-toggle {
-            position: fixed;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
-            padding: 10px 14px;
-            border-radius: 999px;
-            background: rgba(0, 0, 0, 0.35);
-            backdrop-filter: blur(12px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
-            pointer-events: auto;
+            justify-content: flex-start;
         }
 
         .theme-toggle button {
@@ -1453,14 +1452,11 @@ foreach( $faviconCandidates as $candidate ){
 
         @media screen and (max-width: 500px) {
             :root {
-                --body-padding-top: 60px;
-                --body-padding-bottom: 24px;
                 --body-padding-x: 12px;
                 --grid-gap: 24px;
             }
 
             .theme-toggle {
-                padding: 8px 12px;
                 gap: 8px;
             }
 
@@ -1522,17 +1518,6 @@ foreach( $faviconCandidates as $candidate ){
 </head>
 
 <body>
-<div class="theme-toggle" role="group" aria-label="Theme selector">
-	<?php foreach( $themeOrder as $idx => $key ): ?>
-        <button
-            type="button"
-            data-theme-key="<?= htmlspecialchars( $key, ENT_QUOTES, 'UTF-8' ); ?>"
-            aria-pressed="<?= $idx === $defaultThemeIndex ? 'true' : 'false'; ?>"
-            aria-label="<?= htmlspecialchars( $themes[ $key ]['label'], ENT_QUOTES, 'UTF-8' ); ?>"
-            style="--theme-accent: <?= htmlspecialchars( $themes[ $key ]['accent'], ENT_QUOTES, 'UTF-8' ); ?>;"
-        ></button>
-	<?php endforeach; ?>
-</div>
 <main>
     <div class="projects">
         <div class="projects-header">
@@ -1563,6 +1548,20 @@ foreach( $faviconCandidates as $candidate ){
         </div>
     </div>
     <aside>
+        <div class="theme">
+            <h2>theme</h2>
+            <div class="theme-toggle" role="group" aria-label="Theme selector">
+                <?php foreach( $themeOrder as $idx => $key ): ?>
+                <button
+                    type="button"
+                    data-theme-key="<?= htmlspecialchars( $key, ENT_QUOTES, 'UTF-8' ); ?>"
+                    aria-pressed="<?= $idx === $defaultThemeIndex ? 'true' : 'false'; ?>"
+                    aria-label="<?= htmlspecialchars( $themes[ $key ]['label'], ENT_QUOTES, 'UTF-8' ); ?>"
+                    style="--theme-accent: <?= htmlspecialchars( $themes[ $key ]['accent'], ENT_QUOTES, 'UTF-8' ); ?>;"
+                ></button>
+                <?php endforeach; ?>
+            </div>
+        </div>
         <div class="info">
             <h2>info</h2>
             <div class="table" id="basic-info">
