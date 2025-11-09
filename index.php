@@ -1704,9 +1704,98 @@ foreach( $faviconCandidates as $candidate ){
             align-items: center;
             justify-content: space-between;
             gap: 12px;
+            position: relative;
         }
 
         .projects ul li.hidden {
+            display: none;
+        }
+
+        .projects ul li .project-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .projects ul li .project-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .projects ul li:hover .project-controls {
+            opacity: 1;
+        }
+
+        .projects ul li .project-controls button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            font-size: 14px;
+            color: var(--color-muted);
+            transition: all 0.2s ease;
+            border-radius: 3px;
+        }
+
+        .projects ul li .project-controls button:hover {
+            background: var(--input-bg);
+            color: var(--color-accent);
+            transform: scale(1.1);
+        }
+
+        .projects ul li .project-controls button.active {
+            color: var(--color-accent);
+        }
+
+        .projects ul li .category-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: var(--input-bg);
+            color: var(--color-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .projects ul li .category-badge.Laravel { background: #ff2d20; color: white; }
+        .projects ul li .category-badge.WordPress { background: #21759b; color: white; }
+        .projects ul li .category-badge.React { background: #61dafb; color: #282c34; }
+        .projects ul li .category-badge.Node { background: #339933; color: white; }
+        .projects ul li .category-badge.Python { background: #3776ab; color: white; }
+        .projects ul li .category-badge.PHP { background: #777bb4; color: white; }
+        .projects ul li .category-badge.Static { background: #6c757d; color: white; }
+        .projects ul li .category-badge.Other { background: var(--color-accent); color: var(--color-bkg); }
+
+        .favorites-section {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .favorites-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--color-muted);
+            margin: 0 0 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .favorites-section h3::before {
+            content: '⭐';
+            font-size: 14px;
+        }
+
+        .favorites-section.empty {
             display: none;
         }
 
@@ -1776,6 +1865,161 @@ foreach( $faviconCandidates as $candidate ){
         .tools ul li a:hover {
             background-color: var(--color-accent);
             color: var(--color-bkg);
+        }
+
+        /* Project Notes Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--color-bkg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 24px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .modal h3 {
+            margin: 0 0 20px 0;
+            color: var(--color-text);
+            font-size: 18px;
+        }
+
+        .modal label {
+            display: block;
+            margin: 16px 0 6px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--color-muted);
+        }
+
+        .modal input[type="text"],
+        .modal input[type="url"],
+        .modal textarea,
+        .modal select {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--color-text);
+            padding: 10px 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        .modal textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .modal input:focus,
+        .modal textarea:focus,
+        .modal select:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            background: var(--input-focus-bg);
+        }
+
+        .modal .tag-list {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .modal .tag-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--input-bg);
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--color-text);
+        }
+
+        .modal .tag-item button {
+            background: none;
+            border: none;
+            color: var(--color-muted);
+            cursor: pointer;
+            padding: 0;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .modal .tag-item button:hover {
+            color: var(--color-accent);
+        }
+
+        .modal .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            justify-content: flex-end;
+        }
+
+        .modal button {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+
+        .modal button.primary {
+            background: var(--color-accent);
+            color: var(--color-bkg);
+        }
+
+        .modal button.primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .modal button.secondary {
+            background: var(--input-bg);
+            color: var(--color-text);
+        }
+
+        .modal button.secondary:hover {
+            background: var(--input-focus-bg);
+        }
+
+        .modal .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            color: var(--color-muted);
+            font-size: 12px;
+        }
+
+        .modal .info-row strong {
+            color: var(--color-text);
         }
 
         @media screen and (max-width: 900px) {
@@ -1864,7 +2108,15 @@ foreach( $faviconCandidates as $candidate ){
         </div>
         <div class="content">
             <input type="text" placeholder="Search" class="search">
-            <ul>
+
+            <!-- Favorites Section -->
+            <div class="favorites-section empty" id="favorites-section">
+                <h3>Favorites</h3>
+                <ul id="favorites-list"></ul>
+            </div>
+
+            <!-- Main Projects List -->
+            <ul id="projects-list">
 				<?php foreach( $directoryList as $item ):
 					$showSize = $options['display']['show_file_sizes'] ?? true;
 					$size = isset( $item['size'] ) && $showSize ? humanFileSize( $item['size'] ) : '';
@@ -1873,12 +2125,20 @@ foreach( $faviconCandidates as $candidate ){
                         data-name="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>"
                         data-modified="<?= $item['mtime'] ?? 0 ?>"
                         data-size="<?= $item['size'] ?? 0 ?>">
-                        <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
-							<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
-                        </a>
-						<?php if( $size ): ?>
-                            <span class="file-size"><?= $size ?></span>
-						<?php endif; ?>
+                        <div class="project-main">
+                            <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
+                                <?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
+                            </a>
+                            <span class="category-badge" style="display: none;"></span>
+                        </div>
+                        <div class="project-controls">
+                            <button class="favorite-btn" title="Add to favorites" aria-label="Add to favorites">☆</button>
+                            <button class="category-btn" title="Set category" aria-label="Set category">🏷️</button>
+                            <button class="notes-btn" title="Add notes" aria-label="Add notes">📝</button>
+							<?php if( $size ): ?>
+                                <span class="file-size"><?= $size ?></span>
+							<?php endif; ?>
+                        </div>
                     </li>
 				<?php endforeach; ?>
             </ul>
@@ -2144,13 +2404,14 @@ foreach( $faviconCandidates as $candidate ){
     });
 
     const searchInput = document.querySelector('input.search');
-    const projectContent = document.querySelector('.projects .content ul');
+    const projectContent = document.querySelector('#projects-list');
 
     searchInput.focus();
     searchInput.addEventListener('keyup', (e) => {
         let val = searchInput.value.trim().toLowerCase();
 
-        projectContent.querySelectorAll('li').forEach((el) => {
+        // Search both main list and favorites
+        document.querySelectorAll('#projects-list li, #favorites-list li').forEach((el) => {
             // jump to the first displayed dir/file on enter
             if (e.keyCode == 13 && val != '') {
                 const firstResult = projectContent.querySelector('li:not(.hidden) a');
@@ -2169,7 +2430,7 @@ foreach( $faviconCandidates as $candidate ){
 
     // Sort button handlers (client-side, instant sorting with reverse)
     const sortButtons = document.querySelectorAll('.sort-btn');
-    const projectList = document.querySelector('.projects .content ul');
+    const projectList = document.querySelector('#projects-list');
     let currentSort = null;
     let isReversed = false;
 
@@ -2239,6 +2500,321 @@ foreach( $faviconCandidates as $candidate ){
             });
         });
     }
+
+    // ===== PROJECT MANAGEMENT SYSTEM =====
+    const STORAGE_KEY = 'localhostindex_projects';
+
+    // Data structure for project management
+    let projectData = {
+        favorites: [],
+        categories: {},
+        notes: {}
+    };
+
+    // Load data from localStorage
+    function loadProjectData() {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                projectData = JSON.parse(stored);
+            }
+        } catch (e) {
+            console.error('Failed to load project data:', e);
+        }
+    }
+
+    // Save data to localStorage
+    function saveProjectData() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(projectData));
+        } catch (e) {
+            console.error('Failed to save project data:', e);
+        }
+    }
+
+    // Initialize UI based on stored data
+    function initializeProjectUI() {
+        document.querySelectorAll('#projects-list li').forEach(li => {
+            const name = li.dataset.name;
+            if (!name) return;
+
+            // Update favorite button
+            const favoriteBtn = li.querySelector('.favorite-btn');
+            if (projectData.favorites.includes(name)) {
+                favoriteBtn.textContent = '★';
+                favoriteBtn.classList.add('active');
+                favoriteBtn.title = 'Remove from favorites';
+            }
+
+            // Update category badge
+            if (projectData.categories[name]) {
+                const badge = li.querySelector('.category-badge');
+                badge.textContent = projectData.categories[name];
+                badge.className = 'category-badge ' + projectData.categories[name];
+                badge.style.display = '';
+            }
+
+            // Highlight if has notes
+            if (projectData.notes[name]) {
+                const notesBtn = li.querySelector('.notes-btn');
+                notesBtn.classList.add('active');
+            }
+        });
+
+        // Update favorites section
+        updateFavoritesSection();
+    }
+
+    // Update favorites section
+    function updateFavoritesSection() {
+        const favSection = document.getElementById('favorites-section');
+        const favList = document.getElementById('favorites-list');
+        favList.innerHTML = '';
+
+        if (projectData.favorites.length === 0) {
+            favSection.classList.add('empty');
+            return;
+        }
+
+        favSection.classList.remove('empty');
+
+        projectData.favorites.forEach(name => {
+            const originalLi = document.querySelector(`#projects-list li[data-name="${CSS.escape(name)}"]`);
+            if (originalLi) {
+                const clone = originalLi.cloneNode(true);
+                favList.appendChild(clone);
+                attachProjectControls(clone);
+            }
+        });
+    }
+
+    // Attach event listeners to project controls
+    function attachProjectControls(li) {
+        const name = li.dataset.name;
+
+        // Favorite button
+        const favoriteBtn = li.querySelector('.favorite-btn');
+        favoriteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            toggleFavorite(name);
+        });
+
+        // Category button
+        const categoryBtn = li.querySelector('.category-btn');
+        categoryBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            showCategoryModal(name);
+        });
+
+        // Notes button
+        const notesBtn = li.querySelector('.notes-btn');
+        notesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            showNotesModal(name);
+        });
+
+        // Track last opened
+        const link = li.querySelector('a');
+        link.addEventListener('click', () => {
+            trackLastOpened(name);
+        });
+    }
+
+    // Toggle favorite status
+    function toggleFavorite(name) {
+        const index = projectData.favorites.indexOf(name);
+        if (index > -1) {
+            projectData.favorites.splice(index, 1);
+        } else {
+            projectData.favorites.push(name);
+        }
+        saveProjectData();
+        initializeProjectUI();
+    }
+
+    // Show category modal
+    let currentCategoryProject = null;
+    function showCategoryModal(name) {
+        currentCategoryProject = name;
+        const modal = document.getElementById('categoryModal');
+        const select = document.getElementById('category-select');
+        const projectNameSpan = document.getElementById('category-modal-project-name');
+
+        projectNameSpan.textContent = name;
+        select.value = projectData.categories[name] || '';
+        modal.classList.add('active');
+    }
+
+    // Show notes modal
+    let currentNotesProject = null;
+    function showNotesModal(name) {
+        currentNotesProject = name;
+        const modal = document.getElementById('notesModal');
+        const projectNameSpan = document.getElementById('modal-project-name');
+        const categorySelect = document.getElementById('modal-category');
+        const descriptionInput = document.getElementById('modal-description');
+        const urlInput = document.getElementById('modal-url');
+        const lastOpenedSpan = document.getElementById('modal-last-opened');
+        const tagsContainer = document.getElementById('modal-tags');
+
+        projectNameSpan.textContent = name;
+        categorySelect.value = projectData.categories[name] || '';
+
+        const notes = projectData.notes[name] || {};
+        descriptionInput.value = notes.description || '';
+        urlInput.value = notes.url || '';
+
+        // Last opened
+        if (notes.lastOpened) {
+            const date = new Date(notes.lastOpened);
+            lastOpenedSpan.textContent = date.toLocaleString();
+        } else {
+            lastOpenedSpan.textContent = 'Never';
+        }
+
+        // Tags
+        tagsContainer.innerHTML = '';
+        if (notes.tags && notes.tags.length > 0) {
+            notes.tags.forEach(tag => {
+                const tagEl = document.createElement('span');
+                tagEl.className = 'tag-item';
+                tagEl.innerHTML = `${escapeHtml(tag)} <button onclick="removeTag('${escapeHtml(tag)}')">×</button>`;
+                tagsContainer.appendChild(tagEl);
+            });
+        }
+
+        modal.classList.add('active');
+    }
+
+    // Remove tag
+    window.removeTag = function(tag) {
+        if (!currentNotesProject) return;
+        const notes = projectData.notes[currentNotesProject] || {};
+        notes.tags = (notes.tags || []).filter(t => t !== tag);
+        projectData.notes[currentNotesProject] = notes;
+
+        const tagsContainer = document.getElementById('modal-tags');
+        tagsContainer.innerHTML = '';
+        notes.tags.forEach(t => {
+            const tagEl = document.createElement('span');
+            tagEl.className = 'tag-item';
+            tagEl.innerHTML = `${escapeHtml(t)} <button onclick="removeTag('${escapeHtml(t)}')">×</button>`;
+            tagsContainer.appendChild(tagEl);
+        });
+    };
+
+    // Track last opened
+    function trackLastOpened(name) {
+        if (!projectData.notes[name]) {
+            projectData.notes[name] = {};
+        }
+        projectData.notes[name].lastOpened = Date.now();
+        saveProjectData();
+    }
+
+    // Modal: Category Save
+    document.getElementById('category-save').addEventListener('click', () => {
+        if (!currentCategoryProject) return;
+        const category = document.getElementById('category-select').value;
+
+        if (category) {
+            projectData.categories[currentCategoryProject] = category;
+        } else {
+            delete projectData.categories[currentCategoryProject];
+        }
+
+        saveProjectData();
+        initializeProjectUI();
+        document.getElementById('categoryModal').classList.remove('active');
+        currentCategoryProject = null;
+    });
+
+    // Modal: Category Cancel
+    document.getElementById('category-cancel').addEventListener('click', () => {
+        document.getElementById('categoryModal').classList.remove('active');
+        currentCategoryProject = null;
+    });
+
+    // Modal: Notes Save
+    document.getElementById('modal-save').addEventListener('click', () => {
+        if (!currentNotesProject) return;
+
+        const category = document.getElementById('modal-category').value;
+        const description = document.getElementById('modal-description').value;
+        const url = document.getElementById('modal-url').value;
+
+        // Save category
+        if (category) {
+            projectData.categories[currentNotesProject] = category;
+        } else {
+            delete projectData.categories[currentNotesProject];
+        }
+
+        // Save notes
+        if (!projectData.notes[currentNotesProject]) {
+            projectData.notes[currentNotesProject] = {};
+        }
+
+        projectData.notes[currentNotesProject].description = description;
+        projectData.notes[currentNotesProject].url = url;
+
+        saveProjectData();
+        initializeProjectUI();
+        document.getElementById('notesModal').classList.remove('active');
+        currentNotesProject = null;
+    });
+
+    // Modal: Notes Cancel
+    document.getElementById('modal-cancel').addEventListener('click', () => {
+        document.getElementById('notesModal').classList.remove('active');
+        currentNotesProject = null;
+    });
+
+    // Tag input handler
+    document.getElementById('modal-tag-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && currentNotesProject) {
+            e.preventDefault();
+            const input = e.target;
+            const tag = input.value.trim();
+
+            if (tag) {
+                if (!projectData.notes[currentNotesProject]) {
+                    projectData.notes[currentNotesProject] = {};
+                }
+                if (!projectData.notes[currentNotesProject].tags) {
+                    projectData.notes[currentNotesProject].tags = [];
+                }
+
+                if (!projectData.notes[currentNotesProject].tags.includes(tag)) {
+                    projectData.notes[currentNotesProject].tags.push(tag);
+
+                    const tagsContainer = document.getElementById('modal-tags');
+                    const tagEl = document.createElement('span');
+                    tagEl.className = 'tag-item';
+                    tagEl.innerHTML = `${escapeHtml(tag)} <button onclick="removeTag('${escapeHtml(tag)}')">×</button>`;
+                    tagsContainer.appendChild(tagEl);
+                }
+
+                input.value = '';
+            }
+        }
+    });
+
+    // Close modals on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.classList.remove('active');
+                currentCategoryProject = null;
+                currentNotesProject = null;
+            }
+        });
+    });
+
+    // Initialize project management
+    loadProjectData();
+    document.querySelectorAll('#projects-list li').forEach(attachProjectControls);
+    initializeProjectUI();
 
     // Toggle buttons for stats, actions, and info
     let runtimesLoaded = false;
@@ -2416,5 +2992,71 @@ foreach( $faviconCandidates as $candidate ){
         return div.innerHTML;
     }
 </script>
+
+<!-- Project Notes Modal -->
+<div class="modal-overlay" id="notesModal">
+    <div class="modal">
+        <h3>Project Details: <span id="modal-project-name"></span></h3>
+
+        <label for="modal-category">Category</label>
+        <select id="modal-category">
+            <option value="">None</option>
+            <option value="Laravel">Laravel</option>
+            <option value="WordPress">WordPress</option>
+            <option value="React">React</option>
+            <option value="Node">Node.js</option>
+            <option value="Python">Python</option>
+            <option value="PHP">PHP</option>
+            <option value="Static">Static</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <label for="modal-description">Description</label>
+        <textarea id="modal-description" placeholder="Add a description for this project..."></textarea>
+
+        <label for="modal-url">Documentation/URL</label>
+        <input type="url" id="modal-url" placeholder="https://docs.example.com">
+
+        <label>Quick Tags</label>
+        <div class="tag-list" id="modal-tags"></div>
+        <input type="text" id="modal-tag-input" placeholder="Type tag and press Enter...">
+
+        <div class="info-row">
+            <span>Last Opened:</span>
+            <strong id="modal-last-opened">Never</strong>
+        </div>
+
+        <div class="button-group">
+            <button class="secondary" id="modal-cancel">Cancel</button>
+            <button class="primary" id="modal-save">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Category Quick Select Modal -->
+<div class="modal-overlay" id="categoryModal">
+    <div class="modal">
+        <h3>Select Category: <span id="category-modal-project-name"></span></h3>
+
+        <label for="category-select">Category</label>
+        <select id="category-select">
+            <option value="">None</option>
+            <option value="Laravel">Laravel</option>
+            <option value="WordPress">WordPress</option>
+            <option value="React">React</option>
+            <option value="Node">Node.js</option>
+            <option value="Python">Python</option>
+            <option value="PHP">PHP</option>
+            <option value="Static">Static</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <div class="button-group">
+            <button class="secondary" id="category-cancel">Cancel</button>
+            <button class="primary" id="category-save">Save</button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>
