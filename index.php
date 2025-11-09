@@ -1663,14 +1663,14 @@ foreach( $faviconCandidates as $candidate ){
         .projects .content input {
             background: var(--input-bg);
             border: none;
-            padding: 9px 15px;
+            padding: 12px 15px;
             margin-bottom: 10px;
-            width: calc(100% - 30px);
+            width: 100%;
+            box-sizing: border-box;
             border-radius: 4px;
             font-family: monospace;
             font-weight: bold;
             color: var(--input-text);
-            height: 15px;
             transition: all 0.3s ease;
         }
 
@@ -1702,21 +1702,82 @@ foreach( $faviconCandidates as $candidate ){
             margin: 8px 0;
             display: flex;
             align-items: center;
-            justify-content: space-between;
             gap: 12px;
             position: relative;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .projects ul li:hover {
+            background-color: rgba(255, 255, 255, 0.03);
         }
 
         .projects ul li.hidden {
             display: none;
         }
 
+        .projects ul li .project-link {
+            display: flex;
+            align-items: center;
+            flex: 1;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+            padding: 4px 12px 4px 0;
+            margin: -4px 0;
+            min-width: 0;
+        }
+
+        .projects ul li .project-link:hover {
+            color: var(--color-accent);
+        }
+
         .projects ul li .project-main {
             display: flex;
             align-items: center;
             gap: 8px;
-            flex: 1;
+            flex-shrink: 1;
             min-width: 0;
+            padding-left: 12px;
+        }
+
+        .projects ul li .project-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .projects ul li .spacer {
+            flex: 1;
+            min-width: 20px;
+        }
+
+        .projects ul li .project-meta {
+            font-size: 11px;
+            color: var(--color-muted);
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .projects ul li .project-meta .description {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .projects ul li .project-meta .tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
+            background: var(--input-bg);
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: nowrap;
+            font-style: normal;
         }
 
         .projects ul li .project-controls {
@@ -1724,12 +1785,7 @@ foreach( $faviconCandidates as $candidate ){
             align-items: center;
             gap: 6px;
             flex-shrink: 0;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .projects ul li:hover .project-controls {
-            opacity: 1;
+            padding-right: 12px;
         }
 
         .projects ul li .project-controls button {
@@ -1741,6 +1797,11 @@ foreach( $faviconCandidates as $candidate ){
             color: var(--color-muted);
             transition: all 0.2s ease;
             border-radius: 3px;
+            opacity: 0;
+        }
+
+        .projects ul li:hover .project-controls button {
+            opacity: 1;
         }
 
         .projects ul li .project-controls button:hover {
@@ -1753,6 +1814,14 @@ foreach( $faviconCandidates as $candidate ){
             color: var(--color-accent);
         }
 
+        .projects ul li .file-size {
+            font-size: 11px;
+            color: var(--color-muted);
+            min-width: 50px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
         .projects ul li .category-badge {
             font-size: 10px;
             padding: 2px 6px;
@@ -1762,33 +1831,9 @@ foreach( $faviconCandidates as $candidate ){
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 600;
-        }
-
-        .projects ul li .project-meta {
-            font-size: 11px;
-            color: var(--color-muted);
-            font-style: italic;
-            max-width: 400px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .projects ul li .project-meta .tag {
-            display: inline-flex;
-            align-items: center;
-            padding: 2px 6px;
-            margin: 0 2px;
-            background: var(--input-bg);
-            border-radius: 3px;
-            font-size: 10px;
-            font-style: normal;
-            white-space: nowrap;
             flex-shrink: 0;
         }
+
 
         .projects ul li .category-badge.Laravel { background: #ff2d20; color: white; }
         .projects ul li .category-badge.WordPress { background: #21759b; color: white; }
@@ -2145,25 +2190,28 @@ foreach( $faviconCandidates as $candidate ){
             <ul id="projects-list">
 				<?php foreach( $directoryList as $item ):
 					$showSize = $options['display']['show_file_sizes'] ?? true;
-					$size = isset( $item['size'] ) && $showSize ? humanFileSize( $item['size'] ) : '';
+					$sizeBytes = $item['size'] ?? 0;
+					$sizeFormatted = humanFileSize( $sizeBytes );
+					$size = ($showSize && $sizeBytes > 0) ? $sizeFormatted : '';
 				?>
                     <li class="<?= $item['type'] ?>"
                         data-name="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>"
                         data-modified="<?= $item['mtime'] ?? 0 ?>"
                         data-size="<?= $item['size'] ?? 0 ?>">
-                        <div class="project-main">
-                            <a target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
-                                <?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
-                            </a>
-                            <span class="category-badge" style="display: none;"></span>
+                        <a class="project-link" target="_blank" href="<?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>">
+                            <div class="project-main">
+                                <span class="project-name"><?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?></span>
+                            </div>
+                            <span class="spacer"></span>
                             <span class="project-meta" style="display: none;"></span>
-                        </div>
+                            <span class="category-badge" style="display: none;"></span>
+                        </a>
                         <div class="project-controls">
                             <button class="favorite-btn" title="Add to favorites" aria-label="Add to favorites">☆</button>
                             <button class="category-btn" title="Set category" aria-label="Set category">🏷️</button>
                             <button class="notes-btn" title="Add notes" aria-label="Add notes">📝</button>
-                            <span class="file-size" style="<?= $size ? '' : 'display: none;' ?>"><?= $size ?: humanFileSize($item['size'] ?? 0) ?></span>
                         </div>
+                        <span class="file-size" style="display: none;" data-size-formatted="<?= htmlspecialchars($sizeFormatted) ?>"></span>
                     </li>
 				<?php endforeach; ?>
             </ul>
@@ -2510,13 +2558,14 @@ foreach( $faviconCandidates as $candidate ){
                 const showSizes = sortType === 'size';
                 document.querySelectorAll('#projects-list .file-size, #favorites-list .file-size').forEach(sizeEl => {
                     if (showSizes) {
+                        // Show all sizes when sorting by size
+                        const formattedSize = sizeEl.dataset.sizeFormatted || '0 B';
+                        sizeEl.textContent = formattedSize;
                         sizeEl.style.display = '';
                     } else {
-                        // Only hide if it was originally hidden (no content or 0 bytes)
-                        const sizeText = sizeEl.textContent.trim();
-                        if (!sizeText || sizeText === '0 B') {
-                            sizeEl.style.display = 'none';
-                        }
+                        // Hide all sizes when not sorting by size
+                        sizeEl.textContent = '';
+                        sizeEl.style.display = 'none';
                     }
                 });
 
@@ -2631,26 +2680,25 @@ foreach( $faviconCandidates as $candidate ){
                 badge.style.display = '';
             }
 
-            // Display notes metadata
+            // Display notes metadata (description + tags)
             const notes = projectData.notes[name];
             if (notes && (notes.description || notes.tags || notes.url)) {
                 notesBtn.classList.add('active');
 
-                let metaText = '';
+                let metaHTML = '';
 
                 // Show description (truncated)
                 if (notes.description) {
-                    metaText += notes.description.substring(0, 50) + (notes.description.length > 50 ? '...' : '');
+                    metaHTML += `<span class="description">${escapeHtml(notes.description)}</span>`;
                 }
 
                 // Show tags
                 if (notes.tags && notes.tags.length > 0) {
-                    if (metaText) metaText += ' ';
-                    metaText += notes.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
+                    metaHTML += notes.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
                 }
 
-                if (metaText) {
-                    meta.innerHTML = metaText;
+                if (metaHTML) {
+                    meta.innerHTML = metaHTML;
                     meta.style.display = '';
                 }
             }
@@ -2718,7 +2766,7 @@ foreach( $faviconCandidates as $candidate ){
         }
 
         // Track last opened
-        const link = li.querySelector('a');
+        const link = li.querySelector('.project-link');
         if (link) {
             link.addEventListener('click', () => {
                 trackLastOpened(name);
