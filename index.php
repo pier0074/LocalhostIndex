@@ -1768,20 +1768,26 @@ foreach( $faviconCandidates as $candidate ){
             font-size: 11px;
             color: var(--color-muted);
             font-style: italic;
-            max-width: 300px;
+            max-width: 400px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .projects ul li .project-meta .tag {
-            display: inline-block;
-            padding: 1px 4px;
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
             margin: 0 2px;
             background: var(--input-bg);
-            border-radius: 2px;
+            border-radius: 3px;
             font-size: 10px;
             font-style: normal;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .projects ul li .category-badge.Laravel { background: #ff2d20; color: white; }
@@ -2156,9 +2162,7 @@ foreach( $faviconCandidates as $candidate ){
                             <button class="favorite-btn" title="Add to favorites" aria-label="Add to favorites">☆</button>
                             <button class="category-btn" title="Set category" aria-label="Set category">🏷️</button>
                             <button class="notes-btn" title="Add notes" aria-label="Add notes">📝</button>
-							<?php if( $size ): ?>
-                                <span class="file-size"><?= $size ?></span>
-							<?php endif; ?>
+                            <span class="file-size" style="<?= $size ? '' : 'display: none;' ?>"><?= $size ?: humanFileSize($item['size'] ?? 0) ?></span>
                         </div>
                     </li>
 				<?php endforeach; ?>
@@ -2501,6 +2505,20 @@ foreach( $faviconCandidates as $candidate ){
                 if (isReversed) {
                     btn.classList.add('reversed');
                 }
+
+                // Show/hide file sizes based on sort type
+                const showSizes = sortType === 'size';
+                document.querySelectorAll('#projects-list .file-size, #favorites-list .file-size').forEach(sizeEl => {
+                    if (showSizes) {
+                        sizeEl.style.display = '';
+                    } else {
+                        // Only hide if it was originally hidden (no content or 0 bytes)
+                        const sizeText = sizeEl.textContent.trim();
+                        if (!sizeText || sizeText === '0 B') {
+                            sizeEl.style.display = 'none';
+                        }
+                    }
+                });
 
                 // Get all list items
                 const items = Array.from(projectList.children);
