@@ -2591,33 +2591,51 @@ foreach( $faviconCandidates as $candidate ){
     // Attach event listeners to project controls
     function attachProjectControls(li) {
         const name = li.dataset.name;
+        console.log('Attaching controls to:', name);
 
         // Favorite button
         const favoriteBtn = li.querySelector('.favorite-btn');
-        favoriteBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            toggleFavorite(name);
-        });
+        console.log('Favorite button found:', favoriteBtn);
+        if (favoriteBtn) {
+            favoriteBtn.addEventListener('click', (e) => {
+                console.log('Favorite clicked for:', name);
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFavorite(name);
+            });
+        }
 
         // Category button
         const categoryBtn = li.querySelector('.category-btn');
-        categoryBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            showCategoryModal(name);
-        });
+        console.log('Category button found:', categoryBtn);
+        if (categoryBtn) {
+            categoryBtn.addEventListener('click', (e) => {
+                console.log('Category clicked for:', name);
+                e.preventDefault();
+                e.stopPropagation();
+                showCategoryModal(name);
+            });
+        }
 
         // Notes button
         const notesBtn = li.querySelector('.notes-btn');
-        notesBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            showNotesModal(name);
-        });
+        console.log('Notes button found:', notesBtn);
+        if (notesBtn) {
+            notesBtn.addEventListener('click', (e) => {
+                console.log('Notes clicked for:', name);
+                e.preventDefault();
+                e.stopPropagation();
+                showNotesModal(name);
+            });
+        }
 
         // Track last opened
         const link = li.querySelector('a');
-        link.addEventListener('click', () => {
-            trackLastOpened(name);
-        });
+        if (link) {
+            link.addEventListener('click', () => {
+                trackLastOpened(name);
+            });
+        }
     }
 
     // Toggle favorite status
@@ -2713,7 +2731,7 @@ foreach( $faviconCandidates as $candidate ){
     }
 
     // Modal: Category Save
-    document.getElementById('category-save').addEventListener('click', () => {
+    document.getElementById('category-save')?.addEventListener('click', () => {
         if (!currentCategoryProject) return;
         const category = document.getElementById('category-select').value;
 
@@ -2730,13 +2748,13 @@ foreach( $faviconCandidates as $candidate ){
     });
 
     // Modal: Category Cancel
-    document.getElementById('category-cancel').addEventListener('click', () => {
+    document.getElementById('category-cancel')?.addEventListener('click', () => {
         document.getElementById('categoryModal').classList.remove('active');
         currentCategoryProject = null;
     });
 
     // Modal: Notes Save
-    document.getElementById('modal-save').addEventListener('click', () => {
+    document.getElementById('modal-save')?.addEventListener('click', () => {
         if (!currentNotesProject) return;
 
         const category = document.getElementById('modal-category').value;
@@ -2765,13 +2783,13 @@ foreach( $faviconCandidates as $candidate ){
     });
 
     // Modal: Notes Cancel
-    document.getElementById('modal-cancel').addEventListener('click', () => {
+    document.getElementById('modal-cancel')?.addEventListener('click', () => {
         document.getElementById('notesModal').classList.remove('active');
         currentNotesProject = null;
     });
 
     // Tag input handler
-    document.getElementById('modal-tag-input').addEventListener('keypress', (e) => {
+    document.getElementById('modal-tag-input')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && currentNotesProject) {
             e.preventDefault();
             const input = e.target;
