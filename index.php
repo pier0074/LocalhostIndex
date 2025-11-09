@@ -1764,6 +1764,26 @@ foreach( $faviconCandidates as $candidate ){
             font-weight: 600;
         }
 
+        .projects ul li .project-meta {
+            font-size: 11px;
+            color: var(--color-muted);
+            font-style: italic;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .projects ul li .project-meta .tag {
+            display: inline-block;
+            padding: 1px 4px;
+            margin: 0 2px;
+            background: var(--input-bg);
+            border-radius: 2px;
+            font-size: 10px;
+            font-style: normal;
+        }
+
         .projects ul li .category-badge.Laravel { background: #ff2d20; color: white; }
         .projects ul li .category-badge.WordPress { background: #21759b; color: white; }
         .projects ul li .category-badge.React { background: #61dafb; color: #282c34; }
@@ -2130,6 +2150,7 @@ foreach( $faviconCandidates as $candidate ){
                                 <?= htmlspecialchars( $item['name'], ENT_QUOTES, 'UTF-8' ); ?>
                             </a>
                             <span class="category-badge" style="display: none;"></span>
+                            <span class="project-meta" style="display: none;"></span>
                         </div>
                         <div class="project-controls">
                             <button class="favorite-btn" title="Add to favorites" aria-label="Add to favorites">☆</button>
@@ -2415,15 +2436,37 @@ foreach( $faviconCandidates as $candidate ){
             // jump to the first displayed dir/file on enter
             if (e.keyCode == 13 && val != '') {
                 const firstResult = projectContent.querySelector('li:not(.hidden) a');
-                const loc = firstResult.getAttribute('href');
-                searchInput.value = '';
-                window.location = loc;
+                if (firstResult) {
+                    const loc = firstResult.getAttribute('href');
+                    searchInput.value = '';
+                    window.location = loc;
+                }
             }
 
             if (val == '') {
                 el.classList.remove('hidden');
-            } else if (el.innerText.toLowerCase().indexOf(val) <= -1) {
-                el.classList.add('hidden');
+            } else {
+                // Search in project name
+                const name = el.dataset.name || '';
+                let searchText = name.toLowerCase();
+
+                // Also search in notes data
+                const notes = projectData.notes[name];
+                if (notes) {
+                    if (notes.description) searchText += ' ' + notes.description.toLowerCase();
+                    if (notes.url) searchText += ' ' + notes.url.toLowerCase();
+                    if (notes.tags) searchText += ' ' + notes.tags.join(' ').toLowerCase();
+                }
+
+                // Also search in category
+                const category = projectData.categories[name];
+                if (category) searchText += ' ' + category.toLowerCase();
+
+                if (searchText.indexOf(val) <= -1) {
+                    el.classList.add('hidden');
+                } else {
+                    el.classList.remove('hidden');
+                }
             }
         });
     });
@@ -2538,8 +2581,25 @@ foreach( $faviconCandidates as $candidate ){
             const name = li.dataset.name;
             if (!name) return;
 
-            // Update favorite button
+            // Reset state
             const favoriteBtn = li.querySelector('.favorite-btn');
+            favoriteBtn.textContent = '☆';
+            favoriteBtn.classList.remove('active');
+            favoriteBtn.title = 'Add to favorites';
+
+            const badge = li.querySelector('.category-badge');
+            badge.style.display = 'none';
+            badge.textContent = '';
+            badge.className = 'category-badge';
+
+            const notesBtn = li.querySelector('.notes-btn');
+            notesBtn.classList.remove('active');
+
+            const meta = li.querySelector('.project-meta');
+            meta.style.display = 'none';
+            meta.innerHTML = '';
+
+            // Update favorite button
             if (projectData.favorites.includes(name)) {
                 favoriteBtn.textContent = '★';
                 favoriteBtn.classList.add('active');
@@ -2548,16 +2608,33 @@ foreach( $faviconCandidates as $candidate ){
 
             // Update category badge
             if (projectData.categories[name]) {
-                const badge = li.querySelector('.category-badge');
                 badge.textContent = projectData.categories[name];
                 badge.className = 'category-badge ' + projectData.categories[name];
                 badge.style.display = '';
             }
 
-            // Highlight if has notes
-            if (projectData.notes[name]) {
-                const notesBtn = li.querySelector('.notes-btn');
+            // Display notes metadata
+            const notes = projectData.notes[name];
+            if (notes && (notes.description || notes.tags || notes.url)) {
                 notesBtn.classList.add('active');
+
+                let metaText = '';
+
+                // Show description (truncated)
+                if (notes.description) {
+                    metaText += notes.description.substring(0, 50) + (notes.description.length > 50 ? '...' : '');
+                }
+
+                // Show tags
+                if (notes.tags && notes.tags.length > 0) {
+                    if (metaText) metaText += ' ';
+                    metaText += notes.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
+                }
+
+                if (metaText) {
+                    meta.innerHTML = metaText;
+                    meta.style.display = '';
+                }
             }
         });
 
