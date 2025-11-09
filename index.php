@@ -2730,104 +2730,138 @@ foreach( $faviconCandidates as $candidate ){
         saveProjectData();
     }
 
-    // Modal: Category Save
-    document.getElementById('category-save')?.addEventListener('click', () => {
-        if (!currentCategoryProject) return;
-        const category = document.getElementById('category-select').value;
+    // Initialize modal event listeners (delayed until DOM ready)
+    function initializeModalHandlers() {
+        console.log('Initializing modal handlers...');
 
-        if (category) {
-            projectData.categories[currentCategoryProject] = category;
-        } else {
-            delete projectData.categories[currentCategoryProject];
+        // Modal: Category Save
+        const categorySave = document.getElementById('category-save');
+        console.log('Category save button:', categorySave);
+        if (categorySave) {
+            categorySave.addEventListener('click', () => {
+                console.log('Category save clicked');
+                if (!currentCategoryProject) return;
+                const category = document.getElementById('category-select').value;
+
+                if (category) {
+                    projectData.categories[currentCategoryProject] = category;
+                } else {
+                    delete projectData.categories[currentCategoryProject];
+                }
+
+                saveProjectData();
+                initializeProjectUI();
+                document.getElementById('categoryModal').classList.remove('active');
+                currentCategoryProject = null;
+            });
         }
 
-        saveProjectData();
-        initializeProjectUI();
-        document.getElementById('categoryModal').classList.remove('active');
-        currentCategoryProject = null;
-    });
-
-    // Modal: Category Cancel
-    document.getElementById('category-cancel')?.addEventListener('click', () => {
-        document.getElementById('categoryModal').classList.remove('active');
-        currentCategoryProject = null;
-    });
-
-    // Modal: Notes Save
-    document.getElementById('modal-save')?.addEventListener('click', () => {
-        if (!currentNotesProject) return;
-
-        const category = document.getElementById('modal-category').value;
-        const description = document.getElementById('modal-description').value;
-        const url = document.getElementById('modal-url').value;
-
-        // Save category
-        if (category) {
-            projectData.categories[currentNotesProject] = category;
-        } else {
-            delete projectData.categories[currentNotesProject];
+        // Modal: Category Cancel
+        const categoryCancel = document.getElementById('category-cancel');
+        if (categoryCancel) {
+            categoryCancel.addEventListener('click', () => {
+                console.log('Category cancel clicked');
+                document.getElementById('categoryModal').classList.remove('active');
+                currentCategoryProject = null;
+            });
         }
 
-        // Save notes
-        if (!projectData.notes[currentNotesProject]) {
-            projectData.notes[currentNotesProject] = {};
-        }
+        // Modal: Notes Save
+        const notesSave = document.getElementById('modal-save');
+        if (notesSave) {
+            notesSave.addEventListener('click', () => {
+                console.log('Notes save clicked');
+                if (!currentNotesProject) return;
 
-        projectData.notes[currentNotesProject].description = description;
-        projectData.notes[currentNotesProject].url = url;
+                const category = document.getElementById('modal-category').value;
+                const description = document.getElementById('modal-description').value;
+                const url = document.getElementById('modal-url').value;
 
-        saveProjectData();
-        initializeProjectUI();
-        document.getElementById('notesModal').classList.remove('active');
-        currentNotesProject = null;
-    });
+                // Save category
+                if (category) {
+                    projectData.categories[currentNotesProject] = category;
+                } else {
+                    delete projectData.categories[currentNotesProject];
+                }
 
-    // Modal: Notes Cancel
-    document.getElementById('modal-cancel')?.addEventListener('click', () => {
-        document.getElementById('notesModal').classList.remove('active');
-        currentNotesProject = null;
-    });
-
-    // Tag input handler
-    document.getElementById('modal-tag-input')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && currentNotesProject) {
-            e.preventDefault();
-            const input = e.target;
-            const tag = input.value.trim();
-
-            if (tag) {
+                // Save notes
                 if (!projectData.notes[currentNotesProject]) {
                     projectData.notes[currentNotesProject] = {};
                 }
-                if (!projectData.notes[currentNotesProject].tags) {
-                    projectData.notes[currentNotesProject].tags = [];
-                }
 
-                if (!projectData.notes[currentNotesProject].tags.includes(tag)) {
-                    projectData.notes[currentNotesProject].tags.push(tag);
+                projectData.notes[currentNotesProject].description = description;
+                projectData.notes[currentNotesProject].url = url;
 
-                    const tagsContainer = document.getElementById('modal-tags');
-                    const tagEl = document.createElement('span');
-                    tagEl.className = 'tag-item';
-                    tagEl.innerHTML = `${escapeHtml(tag)} <button onclick="removeTag('${escapeHtml(tag)}')">×</button>`;
-                    tagsContainer.appendChild(tagEl);
-                }
-
-                input.value = '';
-            }
-        }
-    });
-
-    // Close modals on overlay click
-    document.querySelectorAll('.modal-overlay').forEach(overlay => {
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                overlay.classList.remove('active');
-                currentCategoryProject = null;
+                saveProjectData();
+                initializeProjectUI();
+                document.getElementById('notesModal').classList.remove('active');
                 currentNotesProject = null;
-            }
+            });
+        }
+
+        // Modal: Notes Cancel
+        const notesCancel = document.getElementById('modal-cancel');
+        if (notesCancel) {
+            notesCancel.addEventListener('click', () => {
+                console.log('Notes cancel clicked');
+                document.getElementById('notesModal').classList.remove('active');
+                currentNotesProject = null;
+            });
+        }
+
+        // Tag input handler
+        const tagInput = document.getElementById('modal-tag-input');
+        if (tagInput) {
+            tagInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && currentNotesProject) {
+                    e.preventDefault();
+                    const input = e.target;
+                    const tag = input.value.trim();
+
+                    if (tag) {
+                        if (!projectData.notes[currentNotesProject]) {
+                            projectData.notes[currentNotesProject] = {};
+                        }
+                        if (!projectData.notes[currentNotesProject].tags) {
+                            projectData.notes[currentNotesProject].tags = [];
+                        }
+
+                        if (!projectData.notes[currentNotesProject].tags.includes(tag)) {
+                            projectData.notes[currentNotesProject].tags.push(tag);
+
+                            const tagsContainer = document.getElementById('modal-tags');
+                            const tagEl = document.createElement('span');
+                            tagEl.className = 'tag-item';
+                            tagEl.innerHTML = `${escapeHtml(tag)} <button onclick="removeTag('${escapeHtml(tag)}')">×</button>`;
+                            tagsContainer.appendChild(tagEl);
+                        }
+
+                        input.value = '';
+                    }
+                }
+            });
+        }
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('active');
+                    currentCategoryProject = null;
+                    currentNotesProject = null;
+                }
+            });
         });
-    });
+
+        console.log('Modal handlers initialized');
+    }
+
+    // Call modal initialization when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeModalHandlers);
+    } else {
+        initializeModalHandlers();
+    }
 
     // Initialize project management
     loadProjectData();
