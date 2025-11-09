@@ -2591,14 +2591,11 @@ foreach( $faviconCandidates as $candidate ){
     // Attach event listeners to project controls
     function attachProjectControls(li) {
         const name = li.dataset.name;
-        console.log('Attaching controls to:', name);
 
         // Favorite button
         const favoriteBtn = li.querySelector('.favorite-btn');
-        console.log('Favorite button found:', favoriteBtn);
         if (favoriteBtn) {
             favoriteBtn.addEventListener('click', (e) => {
-                console.log('Favorite clicked for:', name);
                 e.preventDefault();
                 e.stopPropagation();
                 toggleFavorite(name);
@@ -2607,10 +2604,8 @@ foreach( $faviconCandidates as $candidate ){
 
         // Category button
         const categoryBtn = li.querySelector('.category-btn');
-        console.log('Category button found:', categoryBtn);
         if (categoryBtn) {
             categoryBtn.addEventListener('click', (e) => {
-                console.log('Category clicked for:', name);
                 e.preventDefault();
                 e.stopPropagation();
                 showCategoryModal(name);
@@ -2619,10 +2614,8 @@ foreach( $faviconCandidates as $candidate ){
 
         // Notes button
         const notesBtn = li.querySelector('.notes-btn');
-        console.log('Notes button found:', notesBtn);
         if (notesBtn) {
             notesBtn.addEventListener('click', (e) => {
-                console.log('Notes clicked for:', name);
                 e.preventDefault();
                 e.stopPropagation();
                 showNotesModal(name);
@@ -2732,14 +2725,10 @@ foreach( $faviconCandidates as $candidate ){
 
     // Initialize modal event listeners (delayed until DOM ready)
     function initializeModalHandlers() {
-        console.log('Initializing modal handlers...');
-
         // Modal: Category Save
         const categorySave = document.getElementById('category-save');
-        console.log('Category save button:', categorySave);
         if (categorySave) {
             categorySave.addEventListener('click', () => {
-                console.log('Category save clicked');
                 if (!currentCategoryProject) return;
                 const category = document.getElementById('category-select').value;
 
@@ -2760,7 +2749,6 @@ foreach( $faviconCandidates as $candidate ){
         const categoryCancel = document.getElementById('category-cancel');
         if (categoryCancel) {
             categoryCancel.addEventListener('click', () => {
-                console.log('Category cancel clicked');
                 document.getElementById('categoryModal').classList.remove('active');
                 currentCategoryProject = null;
             });
@@ -2770,7 +2758,6 @@ foreach( $faviconCandidates as $candidate ){
         const notesSave = document.getElementById('modal-save');
         if (notesSave) {
             notesSave.addEventListener('click', () => {
-                console.log('Notes save clicked');
                 if (!currentNotesProject) return;
 
                 const category = document.getElementById('modal-category').value;
@@ -2803,7 +2790,6 @@ foreach( $faviconCandidates as $candidate ){
         const notesCancel = document.getElementById('modal-cancel');
         if (notesCancel) {
             notesCancel.addEventListener('click', () => {
-                console.log('Notes cancel clicked');
                 document.getElementById('notesModal').classList.remove('active');
                 currentNotesProject = null;
             });
@@ -2852,8 +2838,6 @@ foreach( $faviconCandidates as $candidate ){
                 }
             });
         });
-
-        console.log('Modal handlers initialized');
     }
 
     // Call modal initialization when DOM is ready
