@@ -243,16 +243,6 @@ if( isset( $_GET['phpinfo'] ) && $_GET['phpinfo'] === '1' ){
  * This ensures version managers (pyenv, nvm, rbenv, etc.) are loaded
  */
 function detectRuntimeVersion( $command, $versionFlag = '--version', $pattern = '/(\d+\.\d+[\.\d]*)/' ) {
-	$disableFunctions = array_map(
-		'trim',
-		explode( ',', strtolower( (string) ini_get( 'disable_functions' ) ) )
-	);
-	$shellAvailable = function_exists( 'shell_exec' ) && !in_array( 'shell_exec', $disableFunctions, true );
-
-	if( !$shellAvailable ){
-		return null;
-	}
-
 	// Find user's shell profile to source version managers
 	$homeDir = getenv( 'HOME' );
 	$profiles = [ '.zshrc', '.bashrc', '.bash_profile', '.profile' ];
@@ -268,15 +258,16 @@ function detectRuntimeVersion( $command, $versionFlag = '--version', $pattern = 
 		}
 	}
 
-	// Execute command with sourced environment
+	// Execute command with sourced environment (uses safeShellExec for graceful degradation)
 	$fullCommand = $command . ' ' . $versionFlag;
 	$cmd = "bash -c '" . $sourceCmd . escapeshellarg( $fullCommand ) . "' 2>/dev/null";
-	$output = trim( (string) shell_exec( $cmd ) );
+	$output = safeShellExec( $cmd );
 
-	if( $output === '' ){
+	if( $output === null || trim( $output ) === '' ){
 		return null;
 	}
 
+	$output = trim( $output );
 	if( preg_match( $pattern, $output, $matches ) ){
 		return $matches[1];
 	}
@@ -448,11 +439,12 @@ if( isset( $_POST['action'] ) ){
 	exit;
 }
 
-// Detect basic info only (fast - no shell sourcing)
+// Detect basic info only (fast - no shell sourcing, no network calls)
+// MySQL detection moved to AJAX endpoint for faster page load
 function detectBasicInfo() {
 	$info = [];
 
-	// Web Server
+	// Web Server (instant - PHP function)
 	if( function_exists( 'apache_get_version' ) ){
 		$versionString = apache_get_version();
 		if( $versionString !== false ){
@@ -463,14 +455,11 @@ function detectBasicInfo() {
 		}
 	}
 
-	// PHP (always available)
+	// PHP (instant - always available)
 	$info['PHP'] = explode( '-', phpversion() )[0];
 
-	// MySQL/MariaDB (relatively fast)
-	$mysqlVersion = detectMysqlVersion( [] );
-	if( $mysqlVersion && $mysqlVersion !== 'Unknown' ){
-		$info['MySQL'] = $mysqlVersion;
-	}
+	// MySQL detection deferred to AJAX (can take up to 2s timeout)
+	// Use the "+" button on info section to load runtimes including MySQL
 
 	return $info;
 }
@@ -496,12 +485,6 @@ function filenameMatch( $patternArray, $filename ) {
  */
 function detectMysqlVersion( $mysqlOptions = [] ) {
 	$mysqlOptions = is_array( $mysqlOptions ) ? $mysqlOptions : [];
-
-	$disable_functions = array_map(
-		'trim',
-		explode( ',', strtolower( (string) ini_get( 'disable_functions' ) ) )
-	);
-	$shell_available = function_exists( 'shell_exec' ) && !in_array( 'shell_exec', $disable_functions, true );
 
 	$binary_candidates = [];
 	if( !empty( $mysqlOptions['bin'] ) ){
@@ -540,24 +523,23 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 		)
 	);
 
-	if( $shell_available ){
-		// Try first 5 candidates for better detection while keeping good performance
-		foreach( array_slice( $binary_candidates, 0, 5 ) as $binary ){
-			$binary = trim( (string) $binary );
-			if( $binary === '' ){
-				continue;
-			}
-			$escaped_binary = escapeshellarg( $binary );
-			$output = trim( (string) shell_exec( $escaped_binary . ' --version 2>/dev/null' ) );
-			if( $output === '' ){
-				continue;
-			}
-			if( preg_match( '/Distrib\\s+([0-9.]+)/i', $output, $matches ) ){
-				return $matches[1];
-			}
-			if( preg_match( '/Ver\\s+([0-9.]+)/i', $output, $matches ) ){
-				return $matches[1];
-			}
+	// Try first 5 candidates for better detection while keeping good performance
+	foreach( array_slice( $binary_candidates, 0, 5 ) as $binary ){
+		$binary = trim( (string) $binary );
+		if( $binary === '' ){
+			continue;
+		}
+		$escaped_binary = escapeshellarg( $binary );
+		$output = safeShellExec( $escaped_binary . ' --version 2>/dev/null' );
+		if( $output === null || trim( $output ) === '' ){
+			continue;
+		}
+		$output = trim( $output );
+		if( preg_match( '/Distrib\\s+([0-9.]+)/i', $output, $matches ) ){
+			return $matches[1];
+		}
+		if( preg_match( '/Ver\\s+([0-9.]+)/i', $output, $matches ) ){
+			return $matches[1];
 		}
 	}
 
@@ -718,9 +700,27 @@ function formatRelativeTime( $timestamp ) {
 }
 
 /**
- * Calculate directory size recursively (with depth limit for performance)
+ * Safe shell_exec wrapper with availability check for graceful degradation
  */
-function getDirectorySize( $path, $maxDepth = 3, $currentDepth = 0 ) {
+function safeShellExec( $cmd ) {
+	static $shellAvailable = null;
+
+	if( $shellAvailable === null ){
+		$disabled = array_map( 'trim', explode( ',', strtolower( ini_get( 'disable_functions' ) ) ) );
+		$shellAvailable = function_exists( 'shell_exec' ) && !in_array( 'shell_exec', $disabled, true );
+	}
+
+	if( !$shellAvailable ){
+		return null;
+	}
+
+	return @shell_exec( $cmd );
+}
+
+/**
+ * Calculate directory size recursively (with symlink loop protection and skip large dirs)
+ */
+function getDirectorySize( $path, $maxDepth = 2, $currentDepth = 0, &$visited = [] ) {
 	$size = 0;
 
 	// Stop if we've gone too deep (prevent performance issues)
@@ -728,7 +728,21 @@ function getDirectorySize( $path, $maxDepth = 3, $currentDepth = 0 ) {
 		return $size;
 	}
 
+	// Prevent symlink loops by tracking visited real paths
+	$realPath = realpath( $path );
+	if( $realPath === false || isset( $visited[$realPath] ) ){
+		return $size;
+	}
+	$visited[$realPath] = true;
+
 	if( !is_dir( $path ) || !is_readable( $path ) ){
+		return $size;
+	}
+
+	// Skip known large directories that slow down scanning
+	static $skipDirs = ['node_modules', 'vendor', '.git', 'bower_components', '__pycache__', '.venv', 'venv'];
+	$baseName = basename( $path );
+	if( in_array( $baseName, $skipDirs, true ) ){
 		return $size;
 	}
 
@@ -745,9 +759,9 @@ function getDirectorySize( $path, $maxDepth = 3, $currentDepth = 0 ) {
 		$itemPath = $path . '/' . $item;
 
 		if( is_file( $itemPath ) ){
-			$size += filesize( $itemPath );
+			$size += @filesize( $itemPath ) ?: 0;
 		} elseif( is_dir( $itemPath ) ){
-			$size += getDirectorySize( $itemPath, $maxDepth, $currentDepth + 1 );
+			$size += getDirectorySize( $itemPath, $maxDepth, $currentDepth + 1, $visited );
 		}
 	}
 
@@ -916,7 +930,7 @@ if( $diskTotal !== false && $diskTotal > 0 ){
 
 // Memory
 if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
-	$memInfo = @shell_exec( PHP_OS_FAMILY === 'Darwin' ? 'sysctl hw.memsize' : 'free -b | grep Mem' );
+	$memInfo = safeShellExec( PHP_OS_FAMILY === 'Darwin' ? 'sysctl hw.memsize' : 'free -b | grep Mem' );
 	if( $memInfo ){
 		if( PHP_OS_FAMILY === 'Darwin' ){
 			if( preg_match( '/hw\.memsize:\s+(\d+)/', $memInfo, $matches ) ){
@@ -932,15 +946,15 @@ if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
 
 // CPU Info
 if( PHP_OS_FAMILY === 'Darwin' ){
-	$cpuModel = @shell_exec( 'sysctl -n machdep.cpu.brand_string' );
-	$cpuCores = @shell_exec( 'sysctl -n hw.ncpu' );
+	$cpuModel = safeShellExec( 'sysctl -n machdep.cpu.brand_string' );
+	$cpuCores = safeShellExec( 'sysctl -n hw.ncpu' );
 	if( $cpuModel && $cpuCores ){
 		$cpuModel = trim( $cpuModel );
 		$cpuCores = trim( $cpuCores );
 		$statsSystemExpanded['CPU'] = $cpuCores . ' cores';
 	}
 } elseif( PHP_OS_FAMILY === 'Linux' ){
-	$cpuInfo = @shell_exec( 'nproc' );
+	$cpuInfo = safeShellExec( 'nproc' );
 	if( $cpuInfo ){
 		$statsSystemExpanded['CPU'] = trim( $cpuInfo ) . ' cores';
 	}
@@ -948,7 +962,7 @@ if( PHP_OS_FAMILY === 'Darwin' ){
 
 // Uptime
 if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
-	$uptime = @shell_exec( 'uptime' );
+	$uptime = safeShellExec( 'uptime' );
 	if( $uptime && preg_match( '/up\s+(.+?),\s+\d+\s+user/', $uptime, $matches ) ){
 		$statsSystemExpanded['Uptime'] = trim( $matches[1] );
 	}
@@ -956,7 +970,7 @@ if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
 
 // OS Version (in both preview and system expanded)
 if( PHP_OS_FAMILY === 'Darwin' ){
-	$osVersion = @shell_exec( 'sw_vers -productVersion' );
+	$osVersion = safeShellExec( 'sw_vers -productVersion' );
 	if( $osVersion ){
 		$version = trim( $osVersion );
 		$versionParts = explode( '.', $version );
@@ -978,7 +992,7 @@ if( PHP_OS_FAMILY === 'Darwin' ){
 		$statsSystemExpanded['OS'] = $osDisplayValue;
 	}
 } elseif( PHP_OS_FAMILY === 'Linux' ){
-	$osVersion = @shell_exec( "lsb_release -ds 2>/dev/null || cat /etc/*release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'" );
+	$osVersion = safeShellExec( "lsb_release -ds 2>/dev/null || cat /etc/*release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'" );
 	if( $osVersion ){
 		$osValue = trim( explode( "\n", $osVersion )[0] );
 		$statsPreview['OS'] = $osValue;
@@ -1011,23 +1025,23 @@ if( function_exists( 'opcache_get_status' ) ){
 // Server Stats
 // Apache connections
 if( function_exists( 'apache_get_modules' ) ){
-	$apacheStatus = @shell_exec( "netstat -an | grep -E ':(80|443)' | grep ESTABLISHED | wc -l" );
+	$apacheStatus = safeShellExec( "netstat -an | grep -E ':(80|443)' | grep ESTABLISHED | wc -l" );
 	if( $apacheStatus !== null ){
 		$statsServerExpanded['Apache connections'] = trim( $apacheStatus );
 	}
 }
 
 // Active ports
-$activePorts = @shell_exec( "netstat -an | grep LISTEN | awk '{print \$4}' | grep -oE '[0-9]+\$' | sort -u | wc -l" );
+$activePorts = safeShellExec( "netstat -an | grep LISTEN | awk '{print \$4}' | grep -oE '[0-9]+\$' | sort -u | wc -l" );
 if( $activePorts !== null ){
 	$statsServerExpanded['Active ports'] = trim( $activePorts );
 }
 
 // Running processes
 if( PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux' ){
-	$apacheProc = @shell_exec( "ps aux | grep -E 'httpd|apache2' | grep -v grep | wc -l" );
-	$mysqlProc = @shell_exec( "ps aux | grep -E 'mysqld' | grep -v grep | wc -l" );
-	$nodeProc = @shell_exec( "ps aux | grep -E 'node' | grep -v grep | wc -l" );
+	$apacheProc = safeShellExec( "ps aux | grep -E 'httpd|apache2' | grep -v grep | wc -l" );
+	$mysqlProc = safeShellExec( "ps aux | grep -E 'mysqld' | grep -v grep | wc -l" );
+	$nodeProc = safeShellExec( "ps aux | grep -E 'node' | grep -v grep | wc -l" );
 
 	$procCounts = [];
 	if( $apacheProc !== null && (int)trim( $apacheProc ) > 0 ){
