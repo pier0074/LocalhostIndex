@@ -15,22 +15,23 @@ A beautiful, self-contained localhost homepage for local development environment
 - 📂 **Directory Browser** - Automatically scans and displays all projects/folders
 - 🎨 **10 Beautiful Themes** - Switch between bluey, sunny, forest, retro, matrix, nebula, sundown, mono, dark, and light
 - 🔍 **Instant Search** - Filter projects with live search and Enter-to-navigate
-- 🔀 **Instant Sorting** - Client-side sort by name, date, or size with no page reload ✨ NEW
-- 🔄 **Reverse Sort** - Click any sort button twice to reverse order (A-Z ↔ Z-A) ✨ NEW
-- 📁 **Folder Sizes** - Actual folder sizes calculated recursively ✨ NEW
+- 🔀 **Instant Sorting** - Client-side sort by name, date, or size with no page reload
+- 🔄 **Reverse Sort** - Click any sort button twice to reverse order (A-Z ↔ Z-A)
+- 📁 **Folder Sizes** - Actual folder sizes calculated recursively
 - 💾 **File Sizes** - Display file sizes in human-readable format
 - ⚡ **Smart Caching** - 60-second cache for improved performance
-- 🔧 **Multi-Runtime Detection** - Auto-detects Python, Node.js, Ruby, Go, Docker and more
+- 🔧 **Multi-Runtime Detection** - Auto-detects Python, Node.js, Ruby, Go, Docker and more (macOS/Linux)
 - 📊 **Server Dashboard** - Shows Apache, PHP, MySQL, and all detected development tools
-- 📈 **System Statistics** - Total disk, Memory, CPU cores, Uptime, OS version with names (macOS Sonoma, etc.) ✨ NEW
-- 🎛️ **Quick Actions** - Restart Apache/MySQL, Clear Cache, View Logs with one click ✨ NEW
-- 📁 **Collapsible Sections** - All sections expand/collapse with +/- toggle buttons ✨ NEW
-- 🔎 **Preview Mode** - See key info at a glance, expand for full details ✨ NEW
+- 📈 **System Statistics** - Total disk, Memory, CPU cores, Uptime, OS version (macOS/Linux)
+- 🎛️ **Quick Actions** - Restart Apache/MySQL, Clear Cache, View Logs with one click
+- 📁 **Collapsible Sections** - All sections expand/collapse with +/- toggle buttons
+- 🔎 **Preview Mode** - See key info at a glance, expand for full details
 - ⏱️ **Recent Activity** - Displays 2 recent items (folded) or 10 items (expanded)
 - 🔗 **Quick Links** - Configurable shortcuts to phpMyAdmin, phpinfo, or custom tools
 - 📱 **Responsive Design** - Works beautifully on desktop and mobile
 - ♿ **Accessible** - Keyboard navigation and ARIA labels
-- 🔐 **Security Hardened** - CSRF protection, path validation, optional authentication
+- 🔐 **Security Hardened** - CSRF protection, rate limiting, security headers, path validation
+- 🏥 **Health Check** - Built-in `?health` endpoint for monitoring
 - 💾 **Theme Persistence** - Remembers your theme preference via localStorage
 
 ## Installation
@@ -48,6 +49,21 @@ That's it! No dependencies, no build process, no configuration required.
 - PHP 7.4 or higher
 - Apache web server (for Apache version detection)
 - Optional: MySQL/MariaDB (for database version detection)
+
+### Platform Compatibility
+
+| Feature | macOS | Linux | Windows |
+|---------|:-----:|:-----:|:-------:|
+| Core (directory listing, themes, search) | ✅ | ✅ | ✅ |
+| File/folder sizes | ✅ | ✅ | ✅ |
+| Authentication & security | ✅ | ✅ | ✅ |
+| Caching | ✅ | ✅ | ✅ |
+| Runtime detection (Python, Node, etc.) | ✅ | ✅ | ❌ |
+| System stats (Memory, CPU, Uptime) | ✅ | ✅ | ❌ |
+| MySQL version detection | ✅ | ✅ | ⚠️ |
+| Apache version detection | ✅ | ✅ | ✅ |
+
+> **Note**: On Windows, runtime detection and system statistics require Unix shell commands that are not available. Core functionality works fully. MySQL detection works if you configure direct connection credentials.
 
 ## Configuration
 
@@ -215,12 +231,13 @@ To enable password protection:
 
 ### Security Features
 
-✅ **CSRF Protection** - Protects phpinfo() and sensitive endpoints
-✅ **Path Traversal Prevention** - Validates all file paths
-✅ **Password Authentication** - Optional login system
-✅ **Session Management** - Secure session handling
+✅ **CSRF Protection** - Protects phpinfo() and sensitive endpoints (POST-based)
+✅ **Path Traversal Prevention** - Validates all file paths with symlink protection
+✅ **Password Authentication** - Optional login system with rate limiting
+✅ **Session Management** - Secure session handling with regeneration
+✅ **Security Headers** - X-Content-Type-Options, X-Frame-Options, X-XSS-Protection
 ✅ **Input Sanitization** - All user input is escaped
-✅ **Reduced Error Suppression** - Better error handling
+✅ **Graceful Degradation** - Works even when shell_exec is disabled
 
 ### For Local Use Only (Default Configuration)
 
@@ -273,6 +290,23 @@ By default (all security features disabled):
 - Check if localStorage is enabled in browser
 - Try clearing browser cache
 - Ensure you're not in private/incognito mode
+
+## API Endpoints
+
+### Health Check
+Access `?health` to get a JSON response for monitoring:
+
+```json
+{
+  "status": "ok",
+  "timestamp": 1733400000,
+  "php_version": "8.4.0",
+  "server": "2.4.59"
+}
+```
+
+### phpinfo
+Access phpinfo() via the UI link (requires CSRF token, submitted via POST for security).
 
 ## Development
 
