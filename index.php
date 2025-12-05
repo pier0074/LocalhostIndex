@@ -98,19 +98,45 @@ if( !isset( $_SESSION['csrf_token'] ) ){
 	$_SESSION['csrf_token'] = bin2hex( random_bytes( CSRF_TOKEN_LENGTH ) );
 }
 
-// Security: Simple authentication check
+// Security: Simple authentication check with rate limiting
 if( !empty( $options['security']['enable_authentication'] ) && !empty( $options['security']['password'] ) ){
 	if( !isset( $_SESSION['authenticated'] ) ){
-		// Handle login form
-		if( isset( $_POST['password'] ) && isset( $_POST['csrf_token'] ) ){
+		// Rate limiting configuration
+		$maxAttempts = 5;
+		$lockoutTime = 300; // 5 minutes
+
+		// Initialize rate limiting session vars
+		if( !isset( $_SESSION['login_attempts'] ) ){
+			$_SESSION['login_attempts'] = 0;
+			$_SESSION['lockout_until'] = 0;
+		}
+
+		// Check if currently locked out
+		if( $_SESSION['lockout_until'] > time() ){
+			$remaining = $_SESSION['lockout_until'] - time();
+			$login_error = "Too many attempts. Try again in {$remaining} seconds.";
+		}
+		// Handle login form (only if not locked out)
+		elseif( isset( $_POST['password'] ) && isset( $_POST['csrf_token'] ) ){
 			if( hash_equals( $_SESSION['csrf_token'], $_POST['csrf_token'] ) ){
 				if( password_verify( $_POST['password'], $options['security']['password'] ) ){
+					// Success: reset attempts and authenticate
+					$_SESSION['login_attempts'] = 0;
+					$_SESSION['lockout_until'] = 0;
 					session_regenerate_id( true );
 					$_SESSION['authenticated'] = true;
 					header( 'Location: ' . $_SERVER['PHP_SELF'] );
 					exit;
 				} else {
-					$login_error = 'Invalid password';
+					// Failed: increment attempts
+					$_SESSION['login_attempts']++;
+					if( $_SESSION['login_attempts'] >= $maxAttempts ){
+						$_SESSION['lockout_until'] = time() + $lockoutTime;
+						$login_error = "Too many attempts. Try again in {$lockoutTime} seconds.";
+					} else {
+						$remaining = $maxAttempts - $_SESSION['login_attempts'];
+						$login_error = "Invalid password. {$remaining} attempts remaining.";
+					}
 				}
 			}
 		}
@@ -156,15 +182,34 @@ if( !empty( $options['security']['enable_authentication'] ) && !empty( $options[
 
 // Security: Validate and sanitize paths
 function validatePath( $filename, $strict = true ) {
-	// Prevent path traversal
-	if( strpos( $filename, '..' ) !== false || strpos( $filename, '/' ) !== false || strpos( $filename, '\\' ) !== false ){
+	// Reject dangerous characters (null bytes, control chars, shell metacharacters)
+	if( preg_match( '/[<>:"|?*\x00-\x1f]/', $filename ) ){
 		return false;
 	}
 
-	// Additional strict validation
+	// Prevent path traversal
+	if( strpos( $filename, '..' ) !== false ){
+		return false;
+	}
+
+	// Additional strict validation with proper symlink handling
 	if( $strict ){
-		$realPath = realpath( __DIR__ . '/' . $filename );
-		if( $realPath === false || strpos( $realPath, __DIR__ ) !== 0 ){
+		$basePath = realpath( __DIR__ );
+		if( $basePath === false ){
+			return false;
+		}
+
+		$fullPath = __DIR__ . DIRECTORY_SEPARATOR . $filename;
+		$realPath = realpath( $fullPath );
+
+		// Path must exist
+		if( $realPath === false ){
+			return false;
+		}
+
+		// Strict prefix check: must be within base directory
+		// Use DIRECTORY_SEPARATOR to prevent partial matches (e.g., /var/www vs /var/www2)
+		if( $realPath !== $basePath && strpos( $realPath, $basePath . DIRECTORY_SEPARATOR ) !== 0 ){
 			return false;
 		}
 	}
@@ -172,7 +217,7 @@ function validatePath( $filename, $strict = true ) {
 	return true;
 }
 
-// display phpinfo with CSRF protection
+// display phpinfo with CSRF protection (POST preferred for security)
 if( isset( $_GET['phpinfo'] ) && $_GET['phpinfo'] === '1' ){
 	// Check if phpinfo is disabled
 	if( !empty( $options['security']['disable_phpinfo'] ) ){
@@ -180,9 +225,10 @@ if( isset( $_GET['phpinfo'] ) && $_GET['phpinfo'] === '1' ){
 		die( 'phpinfo() has been disabled for security.' );
 	}
 
-	// CSRF protection
+	// CSRF protection - accept POST token (preferred) or GET token (legacy)
 	if( !empty( $options['security']['enable_csrf'] ) ){
-		if( !isset( $_GET['token'] ) || !hash_equals( $_SESSION['csrf_token'], $_GET['token'] ) ){
+		$token = $_POST['csrf_token'] ?? $_GET['token'] ?? '';
+		if( empty( $token ) || !hash_equals( $_SESSION['csrf_token'], $token ) ){
 			http_response_code( 403 );
 			die( 'Invalid security token.' );
 		}
@@ -2276,14 +2322,15 @@ foreach( $faviconCandidates as $candidate ){
                 <h2>extras</h2>
                 <ul>
 					<?php foreach( $options['extras'] as $label => $link ):
-						// Add CSRF token to phpinfo links if CSRF is enabled
-						$final_link = $link;
-						if( !empty( $options['security']['enable_csrf'] ) && strpos( $link, 'phpinfo' ) !== false ){
-							$separator = strpos( $link, '?' ) !== false ? '&' : '?';
-							$final_link = $link . $separator . 'token=' . urlencode( $_SESSION['csrf_token'] );
-						}
+						// Use POST for phpinfo links (CSRF token not exposed in URL)
+						$isPhpinfo = strpos( $link, 'phpinfo' ) !== false;
+						$usePost = $isPhpinfo && !empty( $options['security']['enable_csrf'] );
 					?>
-                        <li><a target="_blank" href="<?= htmlspecialchars( $final_link, ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></a></li>
+						<?php if( $usePost ): ?>
+                        <li><a href="#" onclick="postToPhpinfo(); return false;"><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></a></li>
+						<?php else: ?>
+                        <li><a target="_blank" href="<?= htmlspecialchars( $link, ENT_QUOTES, 'UTF-8' ); ?>"><?= htmlspecialchars( $label, ENT_QUOTES, 'UTF-8' ); ?></a></li>
+						<?php endif; ?>
 					<?php endforeach; ?>
                 </ul>
             </div>
@@ -2405,6 +2452,22 @@ foreach( $faviconCandidates as $candidate ){
     </aside>
 </main>
 <script>
+    // POST-based phpinfo access (CSRF token not exposed in URL)
+    function postToPhpinfo() {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '?phpinfo=1';
+        form.target = '_blank';
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'csrf_token';
+        input.value = '<?= htmlspecialchars( $_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8' ); ?>';
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
+
     const themeData = <?= json_encode( $themesForClient, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
     const themeOrder = <?= json_encode( array_values( $themeOrder ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
     const defaultThemeKey = <?= json_encode( $defaultThemeKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); ?>;
