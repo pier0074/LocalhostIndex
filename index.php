@@ -13,6 +13,9 @@ define( 'MYSQL_TIMEOUT', 2 );             // MySQL connection timeout in seconds
 define( 'RECENT_ITEMS_LIMIT', 10 );       // Number of recent items to display (extended)
 define( 'RECENT_ITEMS_PREVIEW', 2 );      // Number of recent items in preview (folded)
 define( 'CACHE_TTL', 60 );                // Cache time-to-live in seconds
+define( 'MAX_LOGIN_ATTEMPTS', 5 );        // Maximum failed login attempts before lockout
+define( 'LOCKOUT_DURATION', 300 );        // Lockout duration in seconds (5 minutes)
+define( 'DIR_MAX_DEPTH', 2 );             // Maximum recursion depth for directory size calculation
 
 $options = [
 	/**
@@ -98,12 +101,18 @@ if( !isset( $_SESSION['csrf_token'] ) ){
 	$_SESSION['csrf_token'] = bin2hex( random_bytes( CSRF_TOKEN_LENGTH ) );
 }
 
+// Security: HTTP Headers
+header( 'X-Content-Type-Options: nosniff' );
+header( 'X-Frame-Options: SAMEORIGIN' );
+header( 'X-XSS-Protection: 1; mode=block' );
+header( 'Referrer-Policy: strict-origin-when-cross-origin' );
+
 // Security: Simple authentication check with rate limiting
 if( !empty( $options['security']['enable_authentication'] ) && !empty( $options['security']['password'] ) ){
 	if( !isset( $_SESSION['authenticated'] ) ){
-		// Rate limiting configuration
-		$maxAttempts = 5;
-		$lockoutTime = 300; // 5 minutes
+		// Rate limiting using constants
+		$maxAttempts = MAX_LOGIN_ATTEMPTS;
+		$lockoutTime = LOCKOUT_DURATION;
 
 		// Initialize rate limiting session vars
 		if( !isset( $_SESSION['login_attempts'] ) ){
@@ -181,7 +190,7 @@ if( !empty( $options['security']['enable_authentication'] ) && !empty( $options[
 }
 
 // Security: Validate and sanitize paths
-function validatePath( $filename, $strict = true ) {
+function validatePath( string $filename, bool $strict = true ): bool {
 	// Reject dangerous characters (null bytes, control chars, shell metacharacters)
 	if( preg_match( '/[<>:"|?*\x00-\x1f]/', $filename ) ){
 		return false;
@@ -239,10 +248,40 @@ if( isset( $_GET['phpinfo'] ) && $_GET['phpinfo'] === '1' ){
 }
 
 /**
+ * Get Apache version string (extracted for DRY principle)
+ */
+function getApacheVersion(): ?string {
+	if( !function_exists( 'apache_get_version' ) ){
+		return null;
+	}
+	$versionString = apache_get_version();
+	if( $versionString === false ){
+		return null;
+	}
+	$parts = explode( '/', $versionString );
+	if( !isset( $parts[1] ) ){
+		return null;
+	}
+	return explode( ' ', $parts[1] )[0];
+}
+
+// Health check endpoint for monitoring
+if( isset( $_GET['health'] ) ){
+	header( 'Content-Type: application/json' );
+	echo json_encode([
+		'status' => 'ok',
+		'timestamp' => time(),
+		'php_version' => PHP_VERSION,
+		'server' => getApacheVersion() ?? 'unknown'
+	]);
+	exit;
+}
+
+/**
  * Detect runtime version by sourcing user's shell profile
  * This ensures version managers (pyenv, nvm, rbenv, etc.) are loaded
  */
-function detectRuntimeVersion( $command, $versionFlag = '--version', $pattern = '/(\d+\.\d+[\.\d]*)/' ) {
+function detectRuntimeVersion( string $command, string $versionFlag = '--version', string $pattern = '/(\d+\.\d+[\.\d]*)/' ): ?string {
 	// Find user's shell profile to source version managers
 	$homeDir = getenv( 'HOME' );
 	$profiles = [ '.zshrc', '.bashrc', '.bash_profile', '.profile' ];
@@ -278,18 +317,13 @@ function detectRuntimeVersion( $command, $versionFlag = '--version', $pattern = 
 /**
  * Auto-detect installed runtimes and their versions
  */
-function detectRuntimes() {
+function detectRuntimes(): array {
 	$runtimes = [];
 
 	// Web Server
-	if( function_exists( 'apache_get_version' ) ){
-		$versionString = apache_get_version();
-		if( $versionString !== false ){
-			$parts = explode( '/', $versionString );
-			if( isset( $parts[1] ) ){
-				$runtimes['Apache'] = explode( ' ', $parts[1] )[0];
-			}
-		}
+	$apacheVersion = getApacheVersion();
+	if( $apacheVersion !== null ){
+		$runtimes['Apache'] = $apacheVersion;
 	}
 
 	// PHP (always available)
@@ -441,18 +475,13 @@ if( isset( $_POST['action'] ) ){
 
 // Detect basic info only (fast - no shell sourcing, no network calls)
 // MySQL detection moved to AJAX endpoint for faster page load
-function detectBasicInfo() {
+function detectBasicInfo(): array {
 	$info = [];
 
 	// Web Server (instant - PHP function)
-	if( function_exists( 'apache_get_version' ) ){
-		$versionString = apache_get_version();
-		if( $versionString !== false ){
-			$parts = explode( '/', $versionString );
-			if( isset( $parts[1] ) ){
-				$info['Apache'] = explode( ' ', $parts[1] )[0];
-			}
-		}
+	$apacheVersion = getApacheVersion();
+	if( $apacheVersion !== null ){
+		$info['Apache'] = $apacheVersion;
 	}
 
 	// PHP (instant - always available)
@@ -468,7 +497,7 @@ function detectBasicInfo() {
 $info = detectBasicInfo();
 
 // match a given filename against an array of patterns
-function filenameMatch( $patternArray, $filename ) {
+function filenameMatch( array $patternArray, string $filename ): bool {
 	if( empty( $patternArray ) ){
 		return false;
 	}
@@ -483,7 +512,7 @@ function filenameMatch( $patternArray, $filename ) {
 /**
  * Attempt to detect the MySQL server version using CLI tools or optional connection details.
  */
-function detectMysqlVersion( $mysqlOptions = [] ) {
+function detectMysqlVersion( array $mysqlOptions = [] ): string {
 	$mysqlOptions = is_array( $mysqlOptions ) ? $mysqlOptions : [];
 
 	$binary_candidates = [];
@@ -660,7 +689,7 @@ function detectMysqlVersion( $mysqlOptions = [] ) {
 /**
  * Convert bytes into a human-friendly string.
  */
-function humanFileSize( $bytes, $decimals = 1 ) {
+function humanFileSize( $bytes, int $decimals = 1 ): string {
 	if( !is_numeric( $bytes ) || $bytes <= 0 ){
 		return '0 B';
 	}
@@ -674,7 +703,7 @@ function humanFileSize( $bytes, $decimals = 1 ) {
 /**
  * Return a compact relative time string for a timestamp.
  */
-function formatRelativeTime( $timestamp ) {
+function formatRelativeTime( $timestamp ): string {
 	if( !is_numeric( $timestamp ) || $timestamp <= 0 ){
 		return 'unknown';
 	}
@@ -702,7 +731,7 @@ function formatRelativeTime( $timestamp ) {
 /**
  * Safe shell_exec wrapper with availability check for graceful degradation
  */
-function safeShellExec( $cmd ) {
+function safeShellExec( string $cmd ): ?string {
 	static $shellAvailable = null;
 
 	if( $shellAvailable === null ){
@@ -720,7 +749,7 @@ function safeShellExec( $cmd ) {
 /**
  * Calculate directory size recursively (with symlink loop protection and skip large dirs)
  */
-function getDirectorySize( $path, $maxDepth = 2, $currentDepth = 0, &$visited = [] ) {
+function getDirectorySize( string $path, int $maxDepth = DIR_MAX_DEPTH, int $currentDepth = 0, array &$visited = [] ): int {
 	$size = 0;
 
 	// Stop if we've gone too deep (prevent performance issues)
@@ -772,7 +801,7 @@ function getDirectorySize( $path, $maxDepth = 2, $currentDepth = 0, &$visited = 
 /**
  * Get cached directory listing or scan directory
  */
-function getDirectoryListing( $options ) {
+function getDirectoryListing( array $options ): array {
 	$cacheEnabled = $options['display']['enable_cache'] ?? true;
 	$cacheKey = 'directory_listing_cache';
 	$cacheFile = sys_get_temp_dir() . '/' . md5( __DIR__ ) . '_localhostindex.cache';
