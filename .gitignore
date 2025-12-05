@@ -30,6 +30,9 @@ $RECYCLE.BIN/
 *.tmp
 *.bak
 
+# Development files (audit, todos, notes)
+dev/
+
 # User customizations (optional - uncomment if needed)
 # favicon.ico
 # favicon.png
