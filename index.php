@@ -105,6 +105,7 @@ if( !empty( $options['security']['enable_authentication'] ) && !empty( $options[
 		if( isset( $_POST['password'] ) && isset( $_POST['csrf_token'] ) ){
 			if( hash_equals( $_SESSION['csrf_token'], $_POST['csrf_token'] ) ){
 				if( password_verify( $_POST['password'], $options['security']['password'] ) ){
+					session_regenerate_id( true );
 					$_SESSION['authenticated'] = true;
 					header( 'Location: ' . $_SERVER['PHP_SELF'] );
 					exit;
@@ -222,7 +223,8 @@ function detectRuntimeVersion( $command, $versionFlag = '--version', $pattern = 
 	}
 
 	// Execute command with sourced environment
-	$cmd = "bash -c '" . $sourceCmd . escapeshellarg( $command ) . " " . $versionFlag . "' 2>/dev/null";
+	$fullCommand = $command . ' ' . $versionFlag;
+	$cmd = "bash -c '" . $sourceCmd . escapeshellarg( $fullCommand ) . "' 2>/dev/null";
 	$output = trim( (string) shell_exec( $cmd ) );
 
 	if( $output === '' ){
@@ -370,9 +372,29 @@ if( isset( $_POST['action'] ) ){
 			break;
 
 		case 'clear-sessions':
-			$sessionPath = session_save_path() ?: '/tmp';
-			$output = @shell_exec( "find {$sessionPath} -name 'sess_*' -type f -delete 2>&1" );
-			$result = [ 'success' => true, 'message' => 'Session files cleared', 'output' => $output ];
+			$sessionPath = session_save_path() ?: sys_get_temp_dir();
+			$realPath = realpath( $sessionPath );
+			if( $realPath === false || !is_dir( $realPath ) ){
+				$result = [ 'success' => false, 'message' => 'Invalid session path' ];
+				break;
+			}
+			$count = 0;
+			$errors = 0;
+			try {
+				$iterator = new DirectoryIterator( $realPath );
+				foreach( $iterator as $file ){
+					if( $file->isFile() && strpos( $file->getFilename(), 'sess_' ) === 0 ){
+						if( @unlink( $file->getPathname() ) ){
+							$count++;
+						} else {
+							$errors++;
+						}
+					}
+				}
+				$result = [ 'success' => true, 'message' => "Cleared {$count} session files" . ( $errors > 0 ? " ({$errors} failed)" : '' ) ];
+			} catch( Exception $e ){
+				$result = [ 'success' => false, 'message' => 'Failed to access session directory' ];
+			}
 			break;
 	}
 
@@ -699,7 +721,7 @@ function getDirectoryListing( $options ) {
 	if( $cacheEnabled && file_exists( $cacheFile ) ){
 		$cacheData = @file_get_contents( $cacheFile );
 		if( $cacheData !== false ){
-			$cache = @unserialize( $cacheData );
+			$cache = @json_decode( $cacheData, true );
 			if( is_array( $cache ) && isset( $cache['timestamp'], $cache['data'] ) ){
 				if( ( time() - $cache['timestamp'] ) < CACHE_TTL ){
 					return $cache['data'];
@@ -743,11 +765,11 @@ function getDirectoryListing( $options ) {
 
 	// Cache the results
 	if( $cacheEnabled ){
-		$cacheData = serialize([
+		$cacheData = json_encode([
 			'timestamp' => time(),
 			'data' => $directoryList
 		]);
-		@file_put_contents( $cacheFile, $cacheData );
+		@file_put_contents( $cacheFile, $cacheData, LOCK_EX );
 	}
 
 	return $directoryList;
